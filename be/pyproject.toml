@@ -1,0 +1,11 @@
+[project]
+name = "chinese-app-api"
+version = "0.1.0"
+description = "FastAPI backend for the Chinese learning app"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "openai>=2.17.0",
+    "uvicorn>=0.52.0",
+]

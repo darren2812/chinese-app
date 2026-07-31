@@ -7,9 +7,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+node_modules/
+dist/
+dist-ssr/
 *.local
 
 # Editor directories and files
@@ -32,5 +32,6 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
-
+.venv/
+.uv-cache/
+.env
