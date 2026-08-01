@@ -62,24 +62,6 @@ function App() {
     }
   }
 
-  return (
-    <>
-      <section id="center">
-        <div>
-          <h1>{recording ? "Recording..." : "Start speaking..."}</h1>
-        </div>
-        <button
-          type="button"
-          className={`recording-btn ${recording ? "recording-active" : "recording-idle"}`}
-          onClick={handleOnRecordingClick}
-        >
-          {recording ? "Stop recording..." : "Start recording"}
-        </button>
-        {audioUrl && <audio src={audioUrl} controls />}
-      </section>
-    </>
-  );
-
   async function sendAudioForTranscription(audioBlob: Blob) {
     const formData = new FormData();
 
@@ -103,6 +85,24 @@ function App() {
     const data: { text: string } = await response.json();
     console.log(data.text);
   }
+
+  return (
+    <>
+      <section id="center">
+        <div>
+          <h1>{recording ? "Recording..." : "Start speaking..."}</h1>
+        </div>
+        <button
+          type="button"
+          className={`recording-btn ${recording ? "recording-active" : "recording-idle"}`}
+          onClick={handleOnRecordingClick}
+        >
+          {recording ? "Stop recording..." : "Start recording"}
+        </button>
+        {audioUrl && <audio src={audioUrl} controls />}
+      </section>
+    </>
+  );
 }
 
 export default App;
