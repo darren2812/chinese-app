@@ -33,7 +33,13 @@ def transcribe(file: UploadFile = File(...)):
 
         return {"text": transcription.text}
     except Exception as exc:
+        print ("Transcription Error: ", repr(exc))
+        print("filename:", file.filename)
+        print("content type:", file.content_type)
+        contents = file.file.read()
+        print("size:", len(contents))
+        file.file.seek(0)
         raise HTTPException(
             status_code=500,
-            detail="Audio transcription failed"
+            detail=str(exc)
         ) from exc

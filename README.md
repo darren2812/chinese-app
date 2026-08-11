@@ -21,4 +21,4 @@ uv sync
 uv run fastapi dev app/main.py
 ```
 
-In VS Code, select `be/.venv/Scripts/python.exe` as the Python interpreter.
+In VS Code, select `be/.venv/bin/python.exe` as the Python interpreter.

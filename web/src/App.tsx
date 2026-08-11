@@ -27,6 +27,13 @@ function App() {
         // create the media recorder that uses the mic stream
         const mediaRecorder = new MediaRecorder(stream);
 
+        // pushes media recorder data to audio chunks
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
         // defining media recorder behavior when stopped
         mediaRecorder.onstop = async () => {
           const audioBlob = new Blob(audioChunksRef.current, {
@@ -48,13 +55,6 @@ function App() {
         // store this instance of the media recorder on the ref
         mediaRecorderRef.current = mediaRecorder;
 
-        // pushes media recorder data to audio chunks
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data);
-          }
-        };
-
         // start the media recorder
         mediaRecorder.start();
         setRecording(true);
@@ -67,13 +67,17 @@ function App() {
   async function sendAudioForTranscription(audioBlob: Blob) {
     const formData = new FormData();
 
-    formData.append(
-      "file",
-      audioBlob,
-      mediaRecorderRef.current?.mimeType.includes("webm")
-        ? "recording.webm"
-        : "recording.wav",
-    );
+    const extensionByMimeType: Record<string, string> = {
+      "audio/webm": "webm",
+      "audio/ogg": "ogg",
+      "audio/mp4": "m4a",
+      "audio/wav": "wav",
+    };
+
+    const baseMimeType = audioBlob.type.split(";")[0];
+    const extension = extensionByMimeType[baseMimeType] ?? "audio";
+
+    formData.append("file", audioBlob, `recording.${extension}`);
 
     const response = await fetch("http://localhost:8000/transcribe", {
       method: "POST",
@@ -101,7 +105,11 @@ function App() {
         </section>
 
         <footer className="chat__composer">
-          <button type="button" className="recording-btn" onClick={handleOnRecordingClick}>
+          <button
+            type="button"
+            className="recording-btn"
+            onClick={handleOnRecordingClick}
+          >
             {recording ? "Stop recording" : "Start recording"}
           </button>
         </footer>
