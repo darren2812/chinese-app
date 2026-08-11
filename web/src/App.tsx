@@ -1,13 +1,20 @@
 import { useRef, useState } from "react";
+import ChatBubble from "./ChatBubble";
 import "./App.css";
 
 function App() {
-  const [recording, setRecording] = useState(false);
+  type Message = {
+    id: string;
+    text: string;
+    sender: "user" | "assistant";
+  };
 
+  const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   async function handleOnRecordingClick() {
     if (recording) {
@@ -46,7 +53,16 @@ function App() {
           stream.getTracks().forEach((track) => track.stop());
 
           try {
-            await sendAudioForTranscription(audioBlob);
+            const text = await sendAudioForTranscription(audioBlob);
+
+            setMessages((currentMessages) => [
+              ...currentMessages,
+              {
+                id: crypto.randomUUID(),
+                text,
+                sender: "user",
+              },
+            ]);
           } catch (error) {
             console.log("Could not transcribe", error);
           }
@@ -90,6 +106,7 @@ function App() {
 
     const data: { text: string } = await response.json();
     console.log(data.text);
+    return data.text;
   }
 
   return (
@@ -100,7 +117,13 @@ function App() {
             <p className="chat__empty">Start speaking…</p>
           ) : (
             // Render conversation messages here
-            <div>...</div>
+            messages.map((message) => (
+              <ChatBubble
+                key={message.id}
+                text={message.text}
+                sender={message.sender}
+              />
+            ))
           )}
         </section>
 
