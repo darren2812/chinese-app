@@ -1,39 +1,39 @@
-.recording-btn {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
-
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-}
-
-.recording-active {
-  background: none;
-}
-
-.recording-idle {
-  background: var(--accent-bg);
-}
-
-#center {
+.chat {
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
+  background: var(--page-bg);
+}
 
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
+.chat__messages {
+  flex: 1;
+  overflow-y: auto;
+  width: min(100%, 720px);
+  margin-inline: auto;
+  padding: 24px 16px;
+}
+
+.chat__empty {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.chat__composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+  background: var(--page-bg);
+  border-top: 1px solid var(--border);
+}
+
+.recording-btn {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--accent-bg);
 }

@@ -7,12 +7,14 @@ function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [firstChat, setFirstChat] = useState<boolean>(true);
 
   async function handleOnRecordingClick() {
     if (recording) {
       // access the current reference of the media recorder and stop it
       mediaRecorderRef.current?.stop();
       setRecording(false);
+      setFirstChat(false);
     } else {
       // clear previous recording data
       audioChunksRef.current = [];
@@ -88,19 +90,22 @@ function App() {
 
   return (
     <>
-      <section id="center">
-        <div>
-          <h1>{recording ? "Recording..." : "Start speaking..."}</h1>
-        </div>
-        <button
-          type="button"
-          className={`recording-btn ${recording ? "recording-active" : "recording-idle"}`}
-          onClick={handleOnRecordingClick}
-        >
-          {recording ? "Stop recording..." : "Start recording"}
-        </button>
-        {audioUrl && <audio src={audioUrl} controls />}
-      </section>
+      <main className="chat">
+        <section className="chat__messages" aria-live="polite">
+          {firstChat ? (
+            <p className="chat__empty">Start speaking…</p>
+          ) : (
+            // Render conversation messages here
+            <div>...</div>
+          )}
+        </section>
+
+        <footer className="chat__composer">
+          <button type="button" className="recording-btn" onClick={handleOnRecordingClick}>
+            {recording ? "Stop recording" : "Start recording"}
+          </button>
+        </footer>
+      </main>
     </>
   );
 }
