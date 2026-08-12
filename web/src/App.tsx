@@ -9,12 +9,92 @@ function App() {
     sender: "user" | "assistant";
   };
 
+  type VocabularyItem = {
+    english: string;
+    chinese: string;
+    pinyin: string;
+  };
+
+  type ProcessResult = {
+    vocabulary: VocabularyItem[];
+    corrected_sentence: string;
+    grammar_note: string | null;
+  };
+
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [processResult, setProcessResult] = useState<ProcessResult | null>(null);
+
+  async function getResponse(message: string): Promise<string> {
+    const response = await fetch("http://localhost:8000/respond", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not generate response");
+    }
+
+    const data: { text: string } = await response.json();
+    return data.text;
+  }
+
+  async function processSentence(message: string): Promise<ProcessResult> {
+    const response = await fetch("http://localhost:8000/process", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not process sentence");
+    }
+
+    const result = response.json();
+    
+    console.log(result);
+    return result;
+  }
+
+  async function handleRecordedAudio(audioBlob: Blob) {
+    const transcription = await sendAudioForTranscription(audioBlob);
+
+    setMessages((messages) => [
+      ...messages,
+      {
+        id: crypto.randomUUID(),
+        text: transcription,
+        sender: "user",
+      },
+    ]);
+
+    const responsePromise = getResponse(transcription);
+    const processPromise = processSentence(transcription);
+
+    const assistantResponse = await responsePromise;
+
+    setMessages((messages) => [
+      ...messages,
+      {
+        id: crypto.randomUUID(),
+        text: assistantResponse,
+        sender: "assistant",
+      },
+    ]);
+
+    // 4. Process was already running in parallel
+    const processResult = await processPromise;
+    setProcessResult(processResult);
+  }
 
   async function handleOnRecordingClick() {
     if (recording) {
@@ -53,16 +133,7 @@ function App() {
           stream.getTracks().forEach((track) => track.stop());
 
           try {
-            const text = await sendAudioForTranscription(audioBlob);
-
-            setMessages((currentMessages) => [
-              ...currentMessages,
-              {
-                id: crypto.randomUUID(),
-                text,
-                sender: "user",
-              },
-            ]);
+            handleRecordedAudio(audioBlob);
           } catch (error) {
             console.log("Could not transcribe", error);
           }
