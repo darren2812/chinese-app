@@ -2,32 +2,35 @@ import { useRef, useState } from "react";
 import ChatBubble from "./ChatBubble";
 import "./App.css";
 
+type Message = {
+  id: string;
+  text: string;
+  sender: "user" | "assistant";
+  correction?: ProcessResult;
+};
+
+export type VocabularyItem = {
+  english: string;
+  chinese: string;
+  pinyin: string;
+};
+
+export type ProcessResult = {
+  vocabulary: VocabularyItem[];
+  corrected_sentence: string;
+  grammar_note: string | null;
+};
+
 function App() {
-  type Message = {
-    id: string;
-    text: string;
-    sender: "user" | "assistant";
-  };
-
-  type VocabularyItem = {
-    english: string;
-    chinese: string;
-    pinyin: string;
-  };
-
-  type ProcessResult = {
-    vocabulary: VocabularyItem[];
-    corrected_sentence: string;
-    grammar_note: string | null;
-  };
-
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [processResult, setProcessResult] = useState<ProcessResult | null>(null);
+  const [processResult, setProcessResult] = useState<ProcessResult | null>(
+    null,
+  );
 
   async function getResponse(message: string): Promise<string> {
     const response = await fetch("http://localhost:8000/respond", {
@@ -60,7 +63,7 @@ function App() {
     }
 
     const result = response.json();
-    
+
     console.log(result);
     return result;
   }
@@ -193,6 +196,7 @@ function App() {
                 key={message.id}
                 text={message.text}
                 sender={message.sender}
+                correction={message.correction}
               />
             ))
           )}
