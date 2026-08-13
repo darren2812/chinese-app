@@ -28,9 +28,6 @@ function App() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [processResult, setProcessResult] = useState<ProcessResult | null>(
-    null,
-  );
 
   async function getResponse(message: string): Promise<string> {
     const response = await fetch("http://localhost:8000/respond", {
@@ -50,6 +47,7 @@ function App() {
   }
 
   async function processSentence(message: string): Promise<ProcessResult> {
+    console.log("Raw transcript before processing", message);
     const response = await fetch("http://localhost:8000/process", {
       method: "POST",
       headers: {
@@ -70,11 +68,12 @@ function App() {
 
   async function handleRecordedAudio(audioBlob: Blob) {
     const transcription = await sendAudioForTranscription(audioBlob);
+    const userMessageId = crypto.randomUUID();
 
     setMessages((messages) => [
       ...messages,
       {
-        id: crypto.randomUUID(),
+        id: userMessageId,
         text: transcription,
         sender: "user",
       },
@@ -96,7 +95,20 @@ function App() {
 
     // 4. Process was already running in parallel
     const processResult = await processPromise;
-    setProcessResult(processResult);
+
+    if (
+      processResult.vocabulary.length > 0 ||
+      processResult.corrected_sentence?.trim() ||
+      processResult.grammar_note?.trim()
+    ) {
+      setMessages((messages) =>
+        messages.map((message) =>
+          message.id === userMessageId
+            ? { ...message, correction: processResult }
+            : message,
+        ),
+      );
+    }
   }
 
   async function handleOnRecordingClick() {
@@ -190,7 +202,6 @@ function App() {
           {firstChat ? (
             <p className="chat__empty">Start speaking…</p>
           ) : (
-            // Render conversation messages here
             messages.map((message) => (
               <ChatBubble
                 key={message.id}

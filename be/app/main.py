@@ -57,7 +57,7 @@ def respond(request: ChatRequest):
             instructions=(
                 "You are a Mandarin conversation partner. "
                 "The learner may mix English words into Chinese sentences. "
-                "Understand the intended meaning and continue the conversation naturally. "
+                "Understand the intended meaning and continue the conversation naturally in simplified Mandarin. "
             ),
             input=request.message
         )
@@ -90,13 +90,18 @@ def process(request: ChatRequest):
                 Return concise learning feedback for this single message only.
 
                 Your goals:
-                1. For each English word or phrase, provide:
-                - a natural Chinese equivalent
-                - pinyin
-                2. Provide a natural corrected Mandarin version of the full sentence.
-                3. Identify at most one important grammar issue, only if there is a meaningful issue.
-                4. If there are no English words, return an empty vocabulary list.
-                5. If there is no meaningful grammar issue, return null for the grammar note.
+                1. Create a vocabulary item only for an English word or contiguous English phrase
+                that appears verbatim in the transcript.
+                2. Copy that exact text into the `english` field. Do not conjugate, paraphrase,
+                infer, translate, or add English words.
+                3. Never create vocabulary from the corrected sentence or grammar explanation.
+                4. For each English word or phrase, provide:
+                    - a natural Chinese equivalent
+                    - pinyin
+                5. Identify at most one important grammar issue, only if there is a meaningful issue. Output in English.
+                6. If there are no English words in the transcript, return an empty vocabulary list.
+                7. If there is no meaningful grammar issue, return null for the grammar note.
+                8. If no grammar issues or English words in the transcript, return null for the corrected sentence.
                 """,
             input=request.message,
             text_format=ProcessedSentence

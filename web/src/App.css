@@ -34,25 +34,118 @@
   border-top: 1px solid var(--border);
 }
 
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 75%;
+}
+
+.message--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.message--assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
 .chat-bubble {
-  max-width: min(75%, 38rem);
   padding: 0.7rem 1rem;
   border-radius: 1rem;
   line-height: 1.4;
 }
 
 .chat-bubble--user {
-  align-self: flex-end;
   background: #2563eb;
   color: white;
   border-bottom-right-radius: 0.25rem;
 }
 
 .chat-bubble--assistant {
-  align-self: flex-start;
   background: #e5e7eb;
   color: #111827;
   border-bottom-left-radius: 0.25rem;
+}
+
+.correction-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.correction-toggle::after {
+  content: "⌄";
+  display: inline-block;
+  font-size: 1.1em;
+  line-height: 0.8;
+  transition: transform 160ms ease;
+}
+
+.correction-toggle:hover {
+  background: color-mix(in srgb, var(--accent-bg) 60%, var(--accent));
+  border-color: var(--accent);
+}
+
+.correction-toggle:active {
+  transform: translateY(1px);
+}
+
+.correction-toggle:focus-visible {
+  outline: 3px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.correction-toggle[aria-expanded="true"]::after {
+  transform: rotate(180deg);
+}
+
+.correction-card {
+  box-sizing: border-box;
+  width: min(100%, 38rem);
+  padding: var(--space-xs);
+  border: 1px solid var(--accent-border);
+  border-radius: 0.75rem;
+  background: var(--code-bg);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  text-align: left;
+}
+
+.correction-card p {
+  margin-top: var(--space-3xs);
+  overflow-wrap: anywhere;
+}
+
+.correction-card__heading {
+  margin: 0;
+  font-size: var(--step--1);
+}
+
+.correction-card__vocabulary {
+  margin: var(--space-3xs) 0 0;
+  padding-left: 1.25rem;
+}
+
+.correction-card__section + .correction-card__section {
+  margin-top: var(--space-s);
 }
 
 .recording-btn {
