@@ -5,7 +5,8 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import OpenAI
-from pydantic import BaseModel, field_validator
+
+from .schemas import ChatRequest, HoverRequest, ProcessedSentence, SelectionAnalysis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,17 +53,6 @@ def transcribe(file: UploadFile = File(...)):
         ) from exc
 
 
-class ChatRequest(BaseModel):
-    message: str
-
-    @field_validator("message")
-    @classmethod
-    def message_must_not_be_blank(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("message must not be blank")
-        return value
-
 @app.post("/respond")
 def respond(request: ChatRequest):
     try:
@@ -94,17 +84,6 @@ def respond(request: ChatRequest):
             status_code=502,
             detail="Unable to generate a response right now.",
         ) from exc
-
-
-class VocabularyItem(BaseModel):
-    english: str
-    chinese: str
-    pinyin: str
-
-class ProcessedSentence(BaseModel):
-    vocabulary: list[VocabularyItem]
-    corrected_sentence: str | None
-    grammar_note: str | None
 
 
 @app.post("/process")
@@ -145,6 +124,53 @@ def process(request: ChatRequest):
 
         return result
 
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Sentence processing failed")
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to process the sentence right now.",
+        ) from exc
+
+@app.post("/explain-selection")
+def explain_selection(request: HoverRequest):
+    try:
+            response = client.responses.parse(
+                model="gpt-4o-mini",
+                instructions = """
+                Analyze the user's selected Mandarin text using the full sentence as context.
+
+                Return one or more meaningful linguistic components.
+
+                Rules:
+                - Each component must be classified as vocab, grammar, phrase, or clause.
+                - For each component, provide its Mandarin, pinyin, and natural English meaning in context.
+                - If the selection corresponds to one meaningful unit, classify the selection as single.
+                - If the selection contains multiple independently meaningful units, classify it as mixed and return each unit as a separate component.
+                - If the selection cuts awkwardly across word, phrase, or grammar boundaries, classify it as awkward and return the natural components that the selection overlaps.
+                - Do not translate an awkward selection literally.
+                - If the selected text is only part of a larger grammar pattern, return the full relevant grammar pattern as the component.
+                - Prefer reusable learning units when possible. Use clause only when the selected meaning is best represented as a full clause.
+                - Keep meanings concise and learner-friendly.
+                """,
+                input=f"""
+                Selected text: {request.selection}
+                Full sentence: {request.sentence}
+                """,
+                text_format=SelectionAnalysis,
+            )
+    
+            result = response.output_parsed
+    
+            if result is None:
+                raise HTTPException(
+                    status_code=502,
+                    detail="The response could not be processed.",
+                )
+    
+            return result
+    
     except HTTPException:
         raise
     except Exception as exc:
