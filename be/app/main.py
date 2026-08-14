@@ -1,12 +1,16 @@
 import os
+import logging
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-load_dotenv();
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 app = FastAPI()
 client = OpenAI(
@@ -20,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/transcribe") 
+@app.post("/transcribe")
 def transcribe(file: UploadFile = File(...)):
     try:
         transcription = client.audio.transcriptions.create(
@@ -34,20 +38,30 @@ def transcribe(file: UploadFile = File(...)):
         )
 
         return {"text": transcription.text}
+    except HTTPException:
+        raise
     except Exception as exc:
-        print ("Transcription Error: ", repr(exc))
-        print("filename:", file.filename)
-        print("content type:", file.content_type)
-        contents = file.file.read()
-        print("size:", len(contents))
-        file.file.seek(0)
+        logger.exception(
+            "Transcription failed (filename=%r, content_type=%r)",
+            file.filename,
+            file.content_type,
+        )
         raise HTTPException(
             status_code=502,
-            detail="Unable to transcribe audio right now."
+            detail="Unable to transcribe audio right now.",
         ) from exc
-        
+
+
 class ChatRequest(BaseModel):
     message: str
+
+    @field_validator("message")
+    @classmethod
+    def message_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("message must not be blank")
+        return value
 
 @app.post("/respond")
 def respond(request: ChatRequest):
@@ -59,16 +73,29 @@ def respond(request: ChatRequest):
                 "The learner may mix English words into Chinese sentences. "
                 "Understand the intended meaning and continue the conversation naturally in simplified Mandarin. "
             ),
-            input=request.message
+            input=request.message,
         )
-        return {"text": response.output_text}
+
+        text = response.output_text
+
+        if not text.strip():
+            raise HTTPException(
+                status_code=502,
+                detail="The model returned an empty response.",
+            )
+
+        return {"text": text}
+
+    except HTTPException:
+        raise
     except Exception as exc:
-        print ("Response Error: ", repr(exc))
+        logger.exception("Response generation failed")
         raise HTTPException(
             status_code=502,
-            detail="Unable to generate a response right now."
+            detail="Unable to generate a response right now.",
         ) from exc
-        
+
+
 class VocabularyItem(BaseModel):
     english: str
     chinese: str
@@ -78,7 +105,8 @@ class ProcessedSentence(BaseModel):
     vocabulary: list[VocabularyItem]
     corrected_sentence: str | None
     grammar_note: str | None
-        
+
+
 @app.post("/process")
 def process(request: ChatRequest):
     try:
@@ -104,15 +132,15 @@ def process(request: ChatRequest):
                 8. If no grammar issues or English words in the transcript, return null for the corrected sentence.
                 """,
             input=request.message,
-            text_format=ProcessedSentence
+            text_format=ProcessedSentence,
         )
-        
+
         result = response.output_parsed
 
         if result is None:
             raise HTTPException(
                 status_code=502,
-                detail="The response could not be processed."
+                detail="The response could not be processed.",
             )
 
         return result
@@ -120,8 +148,8 @@ def process(request: ChatRequest):
     except HTTPException:
         raise
     except Exception as exc:
-        print("Process Error:", repr(exc))
+        logger.exception("Sentence processing failed")
         raise HTTPException(
             status_code=502,
-            detail="Unable to process the sentence right now."
+            detail="Unable to process the sentence right now.",
         ) from exc
