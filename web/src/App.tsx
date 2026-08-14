@@ -166,6 +166,27 @@ function App() {
     }
   }
 
+  async function handleAssistantSelection(selection: string, sentence: string) {
+    console.log("Selection: ", selection, "Sentence: ", sentence);
+    const response = await fetch("http://localhost:8000/explain-selection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        selection,
+        sentence,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not process sentence");
+    }
+
+    const result = response.json();
+
+    console.log(result);
+    return result;
+  }
+
   async function sendAudioForTranscription(audioBlob: Blob) {
     const formData = new FormData();
 
@@ -208,6 +229,11 @@ function App() {
                 text={message.text}
                 sender={message.sender}
                 correction={message.correction}
+                onSelection={
+                  message.sender === "assistant"
+                    ? handleAssistantSelection
+                    : undefined
+                }
               />
             ))
           )}

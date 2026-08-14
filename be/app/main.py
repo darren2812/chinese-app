@@ -14,9 +14,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = FastAPI()
-client = OpenAI(
-    api_key=os.environ["OPENAI_API_KEY"]
-)
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +22,7 @@ app.add_middleware(
     allow_methods=["POST"],
     allow_headers=["*"],
 )
+
 
 @app.post("/transcribe")
 def transcribe(file: UploadFile = File(...)):
@@ -33,9 +32,9 @@ def transcribe(file: UploadFile = File(...)):
             file=(
                 file.filename or "recording.webm",
                 file.file,
-                file.content_type or "audio/webm"
+                file.content_type or "audio/webm",
             ),
-            prompt="Use Simplified Chinese for Mandarin. Preserve English words as English."
+            prompt="Use Simplified Chinese for Mandarin. Preserve English words as English.",
         )
 
         return {"text": transcription.text}
@@ -133,12 +132,13 @@ def process(request: ChatRequest):
             detail="Unable to process the sentence right now.",
         ) from exc
 
+
 @app.post("/explain-selection")
 def explain_selection(request: HoverRequest):
     try:
-            response = client.responses.parse(
-                model="gpt-4o-mini",
-                instructions = """
+        response = client.responses.parse(
+            model="gpt-4o-mini",
+            instructions="""
                 Analyze the user's selected Mandarin text using the full sentence as context.
 
                 Return one or more meaningful linguistic components.
@@ -154,23 +154,23 @@ def explain_selection(request: HoverRequest):
                 - Prefer reusable learning units when possible. Use clause only when the selected meaning is best represented as a full clause.
                 - Keep meanings concise and learner-friendly.
                 """,
-                input=f"""
+            input=f"""
                 Selected text: {request.selection}
                 Full sentence: {request.sentence}
                 """,
-                text_format=SelectionAnalysis,
+            text_format=SelectionAnalysis,
+        )
+
+        result = response.output_parsed
+
+        if result is None:
+            raise HTTPException(
+                status_code=502,
+                detail="The response could not be processed.",
             )
-    
-            result = response.output_parsed
-    
-            if result is None:
-                raise HTTPException(
-                    status_code=502,
-                    detail="The response could not be processed.",
-                )
-    
-            return result
-    
+
+        return result
+
     except HTTPException:
         raise
     except Exception as exc:
