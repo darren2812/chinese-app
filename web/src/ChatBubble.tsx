@@ -1,11 +1,15 @@
 import { useState } from "react";
-import type { ProcessResult } from "./App";
+import type { ProcessResult, SelectionAnalysis } from "./App";
 
 type ChatBubbleProps = {
   text: string;
   sender: "user" | "assistant";
   correction?: ProcessResult;
-  onSelection?: (selection: string, sentence: string) => void | Promise<void>;
+  selectionAnalysis?: SelectionAnalysis;
+  onSelection?: (
+    selection: string,
+    sentence: string,
+  ) => Promise<SelectionAnalysis>;
 };
 
 export default function ChatBubble({
@@ -15,8 +19,9 @@ export default function ChatBubble({
   onSelection,
 }: ChatBubbleProps) {
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
+  const [selectionAnalysis, setSelectionAnalysis] = useState<SelectionAnalysis | null>(null);
 
-  function handleMouseUp(event: React.MouseEvent<HTMLDivElement>) {
+  async function handleMouseUp(event: React.MouseEvent<HTMLDivElement>) {
     const selection = window.getSelection()?.toString().trim();
 
     if (!selection || !onSelection) return;
@@ -24,7 +29,12 @@ export default function ChatBubble({
     const sentence = getSelectedSentence(event.currentTarget);
     if (!sentence) return;
 
-    void onSelection(selection, sentence);
+    try {
+      const analysis  = await onSelection(selection, sentence);
+      setSelectionAnalysis(analysis);
+    } catch (error) {
+      console.error("Could not analyze sentence.");
+    }
   }
 
   return (
@@ -84,6 +94,23 @@ export default function ChatBubble({
               )}
             </section>
           )}
+        </>
+      )}
+
+      {sender === "assistant" && selectionAnalysis && (
+        <>
+          <div className="correction-card__section">
+            {selectionAnalysis.components.map((component) => (
+              <>
+                <h3 className="correction-card__heading">
+                  {component.mandarin} - {component.pinyin}
+                </h3>
+                <strong>{component.english}</strong>
+                <span> {`(${component.type})`}</span>
+              </>
+            ))}
+            <p>{selectionAnalysis.explanation}</p>
+          </div>
         </>
       )}
     </article>

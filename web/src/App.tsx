@@ -1,12 +1,26 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import ChatBubble from "./ChatBubble";
 import "./App.css";
+
+export type BaseComponent = {
+  type: "vocab" | "grammar" | "phrase" | "clause";
+  mandarin: string;
+  pinyin: string;
+  english: string;
+};
+
+export type SelectionAnalysis = {
+  selection_type: "single" | "mixed" | "awkward";
+  components: BaseComponent[];
+  explanation: string;
+};
 
 type Message = {
   id: string;
   text: string;
   sender: "user" | "assistant";
   correction?: ProcessResult;
+  selectionAnalysis?: SelectionAnalysis;
 };
 
 export type VocabularyItem = {
@@ -60,7 +74,7 @@ function App() {
       throw new Error("Could not process sentence");
     }
 
-    const result = response.json();
+    const result = await response.json();
 
     console.log(result);
     return result;
@@ -178,13 +192,13 @@ function App() {
     });
 
     if (!response.ok) {
-      throw new Error("Could not process sentence");
+      throw new Error("Could not explain selection.");
     }
 
-    const result = response.json();
+    const result = await response.json();
 
     console.log(result);
-    return result;
+    return result as SelectionAnalysis;
   }
 
   async function sendAudioForTranscription(audioBlob: Blob) {
@@ -215,6 +229,31 @@ function App() {
     console.log(data.text);
     return data.text;
   }
+
+  const submittedTestPrompt = useRef(false);
+
+  useEffect(() => {
+    const prompt = import.meta.env.VITE_SUBMIT_TEST_PROMPT?.trim();
+
+    if (!prompt || submittedTestPrompt.current) {
+      return;
+    }
+    submittedTestPrompt.current = true;
+    setFirstChat(false);
+
+    setMessages([{ id: crypto.randomUUID(), text: prompt, sender: "user" }]);
+
+    void getResponse(prompt)
+      .then((text) => {
+        setMessages((messages) => [
+          ...messages,
+          { id: crypto.randomUUID(), text, sender: "assistant" },
+        ]);
+      })
+      .catch((error) => {
+        console.error("Could not generate test response", error);
+      });
+  }, []);
 
   return (
     <>
