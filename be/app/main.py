@@ -96,11 +96,11 @@ def process(request: ChatRequest):
                 Return concise learning feedback for this single message only.
 
                 Your goals:
-                1. Create a vocabulary item only for an English word or contiguous English phrase
-                that appears verbatim in the transcript.
+                1. Create a BaseComponent item only for one or more English words and dtermine whether it is 
+                a vocab item, grammar, phrase, or clause.
                 2. Copy that exact text into the `english` field. Do not conjugate, paraphrase,
                 infer, translate, or add English words.
-                3. Never create vocabulary from the corrected sentence or grammar explanation.
+                3. Never create BaseComponents from the corrected sentence or grammar explanation.
                 4. For each English word or phrase, provide:
                     - a natural Chinese equivalent
                     - pinyin

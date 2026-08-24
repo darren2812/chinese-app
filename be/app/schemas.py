@@ -15,14 +15,8 @@ class ChatRequest(BaseModel):
         return value
 
 
-class VocabularyItem(BaseModel):
-    english: str
-    chinese: str
-    pinyin: str
-
-
 class ProcessedSentence(BaseModel):
-    vocabulary: list[VocabularyItem]
+    components: list[BaseComponent]
     corrected_sentence: str | None
     grammar_note: str | None
 

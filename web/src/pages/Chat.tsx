@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import ChatBubble from "./ChatBubble";
+import ChatBubble from "../components/ChatBubble";
 import "./App.css";
 
 export type BaseComponent = {
@@ -23,14 +23,8 @@ type Message = {
   selectionAnalysis?: SelectionAnalysis;
 };
 
-export type VocabularyItem = {
-  english: string;
-  chinese: string;
-  pinyin: string;
-};
-
 export type ProcessResult = {
-  vocabulary: VocabularyItem[];
+  components: BaseComponent[];
   corrected_sentence: string;
   grammar_note: string | null;
 };
@@ -111,7 +105,7 @@ function App() {
     const processResult = await processPromise;
 
     if (
-      processResult.vocabulary.length > 0 ||
+      processResult.components.length > 0 ||
       processResult.corrected_sentence?.trim() ||
       processResult.grammar_note?.trim()
     ) {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ProcessResult, SelectionAnalysis } from "./App";
+import type { ProcessResult, SelectionAnalysis } from "../pages/Chat";
 
 type ChatBubbleProps = {
   text: string;
@@ -19,7 +19,8 @@ export default function ChatBubble({
   onSelection,
 }: ChatBubbleProps) {
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
-  const [selectionAnalysis, setSelectionAnalysis] = useState<SelectionAnalysis | null>(null);
+  const [selectionAnalysis, setSelectionAnalysis] =
+    useState<SelectionAnalysis | null>(null);
 
   async function handleMouseUp(event: React.MouseEvent<HTMLDivElement>) {
     const selection = window.getSelection()?.toString().trim();
@@ -30,7 +31,7 @@ export default function ChatBubble({
     if (!sentence) return;
 
     try {
-      const analysis  = await onSelection(selection, sentence);
+      const analysis = await onSelection(selection, sentence);
       setSelectionAnalysis(analysis);
     } catch (error) {
       console.error("Could not analyze sentence.");
@@ -59,18 +60,19 @@ export default function ChatBubble({
 
           {isCorrectionOpen && (
             <section className="correction-card" aria-label="Chinese help">
-              {correction.vocabulary.length > 0 && (
+              {correction.components.length > 0 && (
                 <div className="correction-card__section">
                   <h3 className="correction-card__heading">Vocabulary</h3>
                   <ul className="correction-card__vocabulary">
-                    {correction.vocabulary.map((word) => (
-                      <li key={`${word.english}-${word.chinese}`}>
+                    {correction.components.map((word) => (
+                      <li key={`${word.english}-${word.mandarin}`}>
                         <strong>{word.english}</strong>
-                        <span> → {word.chinese}</span>
+                        <span> → {word.mandarin}</span>
                         <span className="correction-card__pinyin">
                           {" "}
                           · {word.pinyin}
                         </span>
+                        <span> · {word.type}</span>
                       </li>
                     ))}
                   </ul>
