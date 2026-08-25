@@ -1,11 +1,17 @@
-import { signIn } from "../lib/auth";
-import { Link, useNavigate } from "react-router";
+import { signUp } from "../lib/auth";
+import { useState } from "react";
+import { useNavigate } from "react-router";
 
-export default function SignIn() {
+export default function SignUp() {
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    if (loading) return;
+
+    setLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email");
@@ -13,7 +19,9 @@ export default function SignIn() {
 
     if (typeof email !== "string" || typeof password !== "string") return;
 
-    const { data, error } = await signIn(email, password);
+    const { data, error } = await signUp(email, password);
+
+    setLoading(false);
 
     if (error) {
       console.error(error.message);
@@ -30,12 +38,15 @@ export default function SignIn() {
       <div className="auth__element">
         <form method="post" onSubmit={handleSubmit}>
           <input name="email" type="email" placeholder="Enter your email" />
-          <input name="password" type="password" placeholder="Enter your password" />
-          <button type="submit">Sign In</button>
+          <input
+            name="password"
+            type="password"
+            placeholder="Enter your password"
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? "Signing up..." : "Sign up"}
+          </button>
         </form>
-        <div className="sign__up__element">
-          <Link to="/sign-up">Don't have an account? Sign up instead.</Link>
-        </div>
       </div>
     </>
   );

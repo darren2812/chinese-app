@@ -29,7 +29,7 @@ export type ProcessResult = {
   grammar_note: string | null;
 };
 
-function App() {
+function Chat() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -286,4 +286,4 @@ function App() {
   );
 }
 
-export default App;
+export default Chat;
