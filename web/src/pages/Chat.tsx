@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import ChatBubble from "../components/ChatBubble";
 import "./App.css";
+import { apiFetch } from "../lib/api";
 
 export type BaseComponent = {
   type: "vocab" | "grammar" | "phrase" | "clause";
@@ -38,13 +39,13 @@ function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
 
   async function getResponse(message: string): Promise<string> {
-    const response = await fetch("http://localhost:8000/respond", {
+    const response = await apiFetch("/respond", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ message }),
-    });
+    })
 
     if (!response.ok) {
       throw new Error("Could not generate response");
@@ -56,7 +57,7 @@ function Chat() {
 
   async function processSentence(message: string): Promise<ProcessResult> {
     console.log("Raw transcript before processing", message);
-    const response = await fetch("http://localhost:8000/process", {
+    const response = await apiFetch("/process", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -176,7 +177,7 @@ function Chat() {
 
   async function handleAssistantSelection(selection: string, sentence: string) {
     console.log("Selection: ", selection, "Sentence: ", sentence);
-    const response = await fetch("http://localhost:8000/explain-selection", {
+    const response = await apiFetch("/explain-selection", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -210,7 +211,7 @@ function Chat() {
 
     formData.append("file", audioBlob, `recording.${extension}`);
 
-    const response = await fetch("http://localhost:8000/transcribe", {
+    const response = await apiFetch("/transcribe", {
       method: "POST",
       body: formData,
     });

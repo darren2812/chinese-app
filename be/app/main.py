@@ -1,17 +1,18 @@
 import os
 import logging
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import OpenAI
 
+load_dotenv()
+
 from .schemas import ChatRequest, HoverRequest, ProcessedSentence, SelectionAnalysis
+from .auth import require_user
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-load_dotenv()
 
 app = FastAPI()
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -53,8 +54,9 @@ def transcribe(file: UploadFile = File(...)):
 
 
 @app.post("/respond")
-def respond(request: ChatRequest):
+def respond(request: ChatRequest, claims: dict = Depends(require_user)):
     try:
+        user_id = claims["sub"]
         response = client.responses.create(
             model="gpt-4o-mini",
             instructions=(
