@@ -50,3 +50,9 @@ class SelectionAnalysis(BaseModel):
 class HoverRequest(BaseModel):
     selection: str
     sentence: str
+
+
+class VocabSource(str, Enum):
+    DETECTED = "detected"
+    USER_MANDARIN = "user_mandarin"
+    USER_ENGLISH = "user_english"

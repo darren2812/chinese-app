@@ -8,8 +8,15 @@ from openai import OpenAI
 
 load_dotenv()
 
-from .schemas import ChatRequest, HoverRequest, ProcessedSentence, SelectionAnalysis
+from .schemas import (
+    ChatRequest,
+    HoverRequest,
+    ProcessedSentence,
+    SelectionAnalysis,
+    VocabSource,
+)
 from .auth import require_user
+from .database import supabase
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,7 +63,6 @@ def transcribe(file: UploadFile = File(...)):
 @app.post("/respond")
 def respond(request: ChatRequest, claims: dict = Depends(require_user)):
     try:
-        user_id = claims["sub"]
         response = client.responses.create(
             model="gpt-4o-mini",
             instructions=(
@@ -88,8 +94,10 @@ def respond(request: ChatRequest, claims: dict = Depends(require_user)):
 
 
 @app.post("/process")
-def process(request: ChatRequest):
+def process(request: ChatRequest, claims: dict = Depends(require_user)):
     try:
+        user_id = claims["sub"]
+
         response = client.responses.parse(
             model="gpt-4o-mini",
             instructions="""
@@ -98,7 +106,7 @@ def process(request: ChatRequest):
                 Return concise learning feedback for this single message only.
 
                 Your goals:
-                1. Create a BaseComponent item only for one or more English words and dtermine whether it is 
+                1. Create a BaseComponent item only for one or more English words and determine whether it is 
                 a vocab item, grammar, phrase, or clause.
                 2. Copy that exact text into the `english` field. Do not conjugate, paraphrase,
                 infer, translate, or add English words.
@@ -122,6 +130,18 @@ def process(request: ChatRequest):
                 status_code=502,
                 detail="The response could not be processed.",
             )
+
+        rows = [
+            {
+                "user_id": user_id,
+                "english": component.english,
+                "mandarin": component.mandarin,
+                "pinyin": component.pinyin,
+                "type": component.type,
+                "source": VocabSource.DETECTED.value,
+            }
+            for component in result.components
+        ]
 
         return result
 
