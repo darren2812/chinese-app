@@ -57,6 +57,7 @@
 .app-sidebar__nav {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2xs);
 }
 
 .app-sidebar__icon {
@@ -246,6 +247,7 @@
   padding: 0 20px;
   border-radius: 999px;
   background: var(--accent-bg);
+  cursor: pointer;
 }
 
 .vocabulary-page {
