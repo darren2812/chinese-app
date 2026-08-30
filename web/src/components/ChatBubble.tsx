@@ -33,7 +33,7 @@ export default function ChatBubble({
     try {
       const analysis = await onSelection(selection, sentence);
       setSelectionAnalysis(analysis);
-    } catch (error) {
+    } catch {
       console.error("Could not analyze sentence.");
     }
   }

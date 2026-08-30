@@ -143,6 +143,12 @@ def process(request: ChatRequest, claims: dict = Depends(require_user)):
             for component in result.components
         ]
 
+        if rows:
+            supabase.table("learning_items").upsert(
+                rows,
+                on_conflict="user_id,english,mandarin",
+            ).execute()
+
         return result
 
     except HTTPException:

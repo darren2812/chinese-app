@@ -1,6 +1,99 @@
-.chat {
-  min-height: 100dvh;
+.app-layout {
   display: flex;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+.app-sidebar {
+  display: flex;
+  flex: 0 0 4rem;
+  flex-direction: column;
+  gap: var(--space-s);
+  min-height: 100dvh;
+  padding: var(--space-s) var(--space-2xs);
+  overflow: hidden;
+  background: var(--code-bg);
+  transition: flex-basis 180ms ease;
+  position: sticky;
+  top: 0;
+}
+
+.app-sidebar--open {
+  flex-basis: 15rem;
+}
+
+.app-sidebar__toggle,
+.app-sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-height: 2.75rem;
+  padding: 0 var(--space-2xs);
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.app-sidebar__toggle {
+  cursor: pointer;
+}
+
+.app-sidebar__toggle:hover,
+.app-sidebar__link:hover,
+.app-sidebar__link--active {
+  background: var(--accent-bg);
+}
+
+.app-sidebar__toggle:focus-visible,
+.app-sidebar__link:focus-visible {
+  outline: 3px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.app-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-sidebar__icon {
+  flex: 0 0 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.app-sidebar__label {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.app-sidebar:not(.app-sidebar--open) .app-sidebar__toggle,
+.app-sidebar:not(.app-sidebar--open) .app-sidebar__link {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.app-sidebar--open .app-sidebar__label {
+  width: auto;
+  opacity: 1;
+  transition-delay: 80ms;
+}
+
+.chat {
+  min-width: 0;
+  min-height: 100%;
+  display: flex;
+  flex: 1;
   flex-direction: column;
   background: var(--page-bg);
 }
@@ -11,9 +104,9 @@
   gap: 0.75rem;
   flex: 1;
   overflow-y: auto;
-  width: min(100%, 720px);
+  width: min(100%, 800px);
   margin-inline: auto;
-  padding: 24px 16px;
+  padding: var(--space-m) var(--space-s);
 }
 
 .chat__empty {
@@ -29,9 +122,9 @@
   bottom: 0;
   display: flex;
   justify-content: center;
-  padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+  padding: var(--space-s) var(--space-s)
+    max(var(--space-m), env(safe-area-inset-bottom));
   background: var(--page-bg);
-  border-top: 1px solid var(--border);
 }
 
 .message {
@@ -153,4 +246,20 @@
   padding: 0 20px;
   border-radius: 999px;
   background: var(--accent-bg);
+}
+
+.vocabulary-page {
+  flex: 1;
+  padding: var(--space-l);
+  background: var(--bg);
+}
+
+@media (max-width: 640px) {
+  .app-sidebar--open {
+    flex-basis: 12rem;
+  }
+
+  .vocabulary-page {
+    padding: var(--space-m);
+  }
 }

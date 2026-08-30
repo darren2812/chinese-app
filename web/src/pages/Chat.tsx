@@ -34,7 +34,6 @@ function Chat() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
 
@@ -150,9 +149,6 @@ function Chat() {
           const audioBlob = new Blob(audioChunksRef.current, {
             type: mediaRecorder.mimeType,
           });
-
-          const url = URL.createObjectURL(audioBlob);
-          setAudioUrl(url);
 
           stream.getTracks().forEach((track) => track.stop());
 
