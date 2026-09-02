@@ -153,7 +153,7 @@ function Chat() {
           stream.getTracks().forEach((track) => track.stop());
 
           try {
-            handleRecordedAudio(audioBlob);
+            await handleRecordedAudio(audioBlob);
           } catch (error) {
             console.log("Could not transcribe", error);
           }
