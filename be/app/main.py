@@ -57,6 +57,200 @@ def get_user_message(message_id: UUID, user_id: str) -> dict:
     return result.data
 
 
+@app.post("/conversations")
+def create_conversation(claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
+    try:
+        insert_result = (
+            supabase.table("conversations").insert({"user_id": user_id}).execute()
+        )
+        if not insert_result.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Conversation was created but Supabase did not return it.",
+            )
+
+        conversation = insert_result.data[0]
+        if not isinstance(conversation, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected conversation format.",
+            )
+
+        conversation_id = conversation.get("id")
+        if not isinstance(conversation_id, str):
+            raise HTTPException(
+                status_code=500,
+                detail="Created conversation has no valid ID.",
+            )
+
+        return {"id": conversation_id}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to create conversation for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to create a conversation right now.",
+        ) from exc
+
+
+
+
+@app.get("/conversations")
+def get_conversations(claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
+    try:
+
+        result = (
+            supabase.table("conversations")
+            .select("id, title, created_at, updated_at")
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
+            .execute()
+        )
+
+        if not isinstance(result.data, list):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected conversations format.",
+            )
+
+        return result.data
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch conversations for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to fetch conversations right now.",
+        ) from exc
+
+
+@app.get("/conversations/{conversation_id}/messages")
+def get_conversation_messages(
+    conversation_id: UUID,
+    claims: dict = Depends(require_user),
+):
+    user_id = claims["sub"]
+
+    try:
+        conversation_result = (
+            supabase.table("conversations")
+            .select("id")
+            .eq("id", str(conversation_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not conversation_result.data:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found.",
+            )
+
+        result = (
+            supabase.table("messages")
+            .select("id, conversation_id, role, content, correction, created_at")
+            .eq("conversation_id", str(conversation_id))
+            .eq("user_id", user_id)
+            .order("created_at")
+            .execute()
+        )
+
+        if not isinstance(result.data, list):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected messages format.",
+            )
+
+        return result.data
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Failed to fetch messages for conversation %s and user %s",
+            conversation_id,
+            user_id,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to fetch conversation messages right now.",
+        ) from exc
+
+
+@app.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: UUID,
+    claims: dict = Depends(require_user),
+):
+    user_id = claims["sub"]
+
+    try:
+        conversation_result = (
+            supabase.table("conversations")
+            .delete()
+            .eq("id", str(conversation_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not conversation_result.data:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found.",
+            )
+
+        return {"id": str(conversation_id), "deleted": True}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Failed to delete conversation %s for user %s",
+            conversation_id,
+            user_id,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to delete conversation right now.",
+        ) from exc
+
+
+@app.patch("/conversations/{conversation_id}")
+def update_conversation(
+    conversation_id: UUID,
+    title: str,
+    claims: dict = Depends(require_user),
+):
+    user_id = claims["sub"]
+
+    try:
+        result = (
+            supabase.table("conversations")
+            .update({"title": title})
+            .eq("id", str(conversation_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+
+        return result.data[0]
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to update conversation for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to update the conversation right now.",
+        ) from exc
+
 @app.post("/messages")
 def create_message(request: CreateMessageRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
@@ -91,36 +285,6 @@ def create_message(request: CreateMessageRequest, claims: dict = Depends(require
         raise HTTPException(
             status_code=502,
             detail="Unable to create the message right now.",
-        ) from exc
-
-
-@app.post("/transcribe")
-def transcribe(file: UploadFile = File(...), claims: dict = Depends(require_user)):
-    user_id = claims["sub"]
-    try:
-        transcription = client.audio.transcriptions.create(
-            model="gpt-4o-mini-transcribe",
-            file=(
-                file.filename or "recording.webm",
-                file.file,
-                file.content_type or "audio/webm",
-            ),
-            prompt="Use Simplified Chinese for Mandarin. Preserve English words as English.",
-        )
-
-        return {"text": transcription.text}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception(
-            "Transcription failed for user %s (filename=%r, content_type=%r)",
-            user_id,
-            file.filename,
-            file.content_type,
-        )
-        raise HTTPException(
-            status_code=502,
-            detail="Unable to transcribe audio right now.",
         ) from exc
 
 
@@ -290,194 +454,31 @@ def explain_selection(request: HoverRequest, claims: dict = Depends(require_user
         ) from exc
 
 
-@app.post("/conversations")
-def create_conversation(claims: dict = Depends(require_user)):
+@app.post("/transcribe")
+def transcribe(file: UploadFile = File(...), claims: dict = Depends(require_user)):
     user_id = claims["sub"]
     try:
-        insert_result = (
-            supabase.table("conversations").insert({"user_id": user_id}).execute()
-        )
-        if not insert_result.data:
-            raise HTTPException(
-                status_code=500,
-                detail="Conversation was created but Supabase did not return it.",
-            )
-
-        conversation = insert_result.data[0]
-        if not isinstance(conversation, dict):
-            raise HTTPException(
-                status_code=500,
-                detail="Supabase returned an unexpected conversation format.",
-            )
-
-        conversation_id = conversation.get("id")
-        if not isinstance(conversation_id, str):
-            raise HTTPException(
-                status_code=500,
-                detail="Created conversation has no valid ID.",
-            )
-
-        return {"id": conversation_id}
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Failed to create conversation for user %s", user_id)
-        raise HTTPException(
-            status_code=502,
-            detail="Unable to create a conversation right now.",
-        ) from exc
-
-
-@app.get("/conversations")
-def get_conversations(claims: dict = Depends(require_user)):
-    user_id = claims["sub"]
-    try:
-
-        result = (
-            supabase.table("conversations")
-            .select("id, title, created_at, updated_at")
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-            .execute()
+        transcription = client.audio.transcriptions.create(
+            model="gpt-4o-mini-transcribe",
+            file=(
+                file.filename or "recording.webm",
+                file.file,
+                file.content_type or "audio/webm",
+            ),
+            prompt="Use Simplified Chinese for Mandarin. Preserve English words as English.",
         )
 
-        if not isinstance(result.data, list):
-            raise HTTPException(
-                status_code=500,
-                detail="Supabase returned an unexpected conversations format.",
-            )
-
-        return result.data
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Failed to fetch conversations for user %s", user_id)
-        raise HTTPException(
-            status_code=502,
-            detail="Unable to fetch conversations right now.",
-        ) from exc
-
-
-@app.get("/conversations/{conversation_id}/messages")
-def get_conversation_messages(
-    conversation_id: UUID,
-    claims: dict = Depends(require_user),
-):
-    user_id = claims["sub"]
-
-    try:
-        conversation_result = (
-            supabase.table("conversations")
-            .select("id")
-            .eq("id", str(conversation_id))
-            .eq("user_id", user_id)
-            .execute()
-        )
-
-        if not conversation_result.data:
-            raise HTTPException(
-                status_code=404,
-                detail="Conversation not found.",
-            )
-
-        result = (
-            supabase.table("messages")
-            .select("id, conversation_id, role, content, correction, created_at")
-            .eq("conversation_id", str(conversation_id))
-            .eq("user_id", user_id)
-            .order("created_at")
-            .execute()
-        )
-
-        if not isinstance(result.data, list):
-            raise HTTPException(
-                status_code=500,
-                detail="Supabase returned an unexpected messages format.",
-            )
-
-        return result.data
-
+        return {"text": transcription.text}
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception(
-            "Failed to fetch messages for conversation %s and user %s",
-            conversation_id,
+            "Transcription failed for user %s (filename=%r, content_type=%r)",
             user_id,
+            file.filename,
+            file.content_type,
         )
         raise HTTPException(
             status_code=502,
-            detail="Unable to fetch conversation messages right now.",
-        ) from exc
-
-
-@app.delete("/conversations/{conversation_id}")
-def delete_conversation(
-    conversation_id: UUID,
-    claims: dict = Depends(require_user),
-):
-    user_id = claims["sub"]
-
-    try:
-        conversation_result = (
-            supabase.table("conversations")
-            .delete()
-            .eq("id", str(conversation_id))
-            .eq("user_id", user_id)
-            .execute()
-        )
-
-        if not conversation_result.data:
-            raise HTTPException(
-                status_code=404,
-                detail="Conversation not found.",
-            )
-
-        return {"id": str(conversation_id), "deleted": True}
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception(
-            "Failed to delete conversation %s for user %s",
-            conversation_id,
-            user_id,
-        )
-        raise HTTPException(
-            status_code=502,
-            detail="Unable to delete conversation right now.",
-        ) from exc
-
-
-@app.patch("/conversations/{conversation_id}")
-def update_conversation(
-    conversation_id: UUID,
-    title: str,
-    claims: dict = Depends(require_user),
-):
-    user_id = claims["sub"]
-
-    try:
-        result = (
-            supabase.table("conversations")
-            .update({"title": title})
-            .eq("id", str(conversation_id))
-            .eq("user_id", user_id)
-            .execute()
-        )
-
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Conversation not found.")
-
-        return result.data[0]
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Failed to update conversation for user %s", user_id)
-        raise HTTPException(
-            status_code=502,
-            detail="Unable to update the conversation right now.",
+            detail="Unable to transcribe audio right now.",
         ) from exc
