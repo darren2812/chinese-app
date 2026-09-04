@@ -27,7 +27,7 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
       <nav className="app-sidebar__nav" aria-label="Main navigation">
         <NavLink
-          to="/chat"
+          to="/app"
           end
           className={({ isActive }) =>
             `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`

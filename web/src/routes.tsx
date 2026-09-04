@@ -19,7 +19,7 @@ export const router = createBrowserRouter([
     Component: SignUp,
   },
   {
-    path: "/chat",
+    path: "/app",
     Component: AppLayout,
     children: [
       {
@@ -31,7 +31,7 @@ export const router = createBrowserRouter([
         Component: Vocabulary,
       },
       {
-        path: ":conversationId",
+        path: "chat/:conversationId",
         Component: Chat,
       },
     ],

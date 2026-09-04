@@ -131,7 +131,7 @@ function Chat() {
 
     if (!activeConversationId) {
       activeConversationId = await createConversation();
-      navigate(`/chat/${activeConversationId}`, { replace: true });
+      navigate(`/app/chat/${activeConversationId}`, { replace: true });
     }
 
     const userMessageId = await createMessage({
@@ -338,7 +338,11 @@ function Chat() {
     void submitTestPrompt();
     */
 
-    if (!conversationId) return;
+    if (!conversationId) {
+      setMessages([]);
+      setFirstChat(true);
+      return;
+    }
 
     async function loadConversation() {
       const response = await apiFetch(
