@@ -1,18 +1,10 @@
 from enum import Enum
-
+from uuid import UUID
 from pydantic import BaseModel, field_validator
 
 
-class ChatRequest(BaseModel):
-    message: str
-
-    @field_validator("message")
-    @classmethod
-    def message_must_not_be_blank(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("message must not be blank")
-        return value
+class MessageIdRequest(BaseModel):
+    message_id: UUID
 
 
 class ProcessedSentence(BaseModel):
@@ -56,3 +48,13 @@ class VocabSource(str, Enum):
     DETECTED = "detected"
     USER_MANDARIN = "user_mandarin"
     USER_ENGLISH = "user_english"
+
+
+class Role(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class CreateMessageRequest(BaseModel):
+    conversation_id: str
+    content: str

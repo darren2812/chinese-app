@@ -30,21 +30,27 @@ export type ProcessResult = {
   grammar_note: string | null;
 };
 
+type CreateMessageInput = {
+  conversationId: string;
+  content: string;
+};
+
 function Chat() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
-  async function getResponse(message: string): Promise<string> {
+  async function getResponse(userMessageId: string): Promise<string> {
     const response = await apiFetch("/respond", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
-    })
+      body: JSON.stringify({ message_id: userMessageId }),
+    });
 
     if (!response.ok) {
       throw new Error("Could not generate response");
@@ -54,14 +60,13 @@ function Chat() {
     return data.text;
   }
 
-  async function processSentence(message: string): Promise<ProcessResult> {
-    console.log("Raw transcript before processing", message);
+  async function processSentence(userMessageId: string): Promise<ProcessResult> {
     const response = await apiFetch("/process", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message_id: userMessageId }),
     });
 
     if (!response.ok) {
@@ -74,9 +79,50 @@ function Chat() {
     return result;
   }
 
+  async function createConversation(): Promise<string> {
+    const response = await apiFetch("/conversations", {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not create conversation");
+    }
+    const result: { id: string } = await response.json();
+
+    return result.id;
+  }
+
+  async function createMessage({
+    conversationId,
+    content,
+  }: CreateMessageInput): Promise<string> {
+    const response = await apiFetch("/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        content,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not create message");
+    }
+
+    const result: { id: string } = await response.json();
+    return result.id;
+  }
+
   async function handleRecordedAudio(audioBlob: Blob) {
     const transcription = await sendAudioForTranscription(audioBlob);
-    const userMessageId = crypto.randomUUID();
+
+    const activeConversationId = conversationId ?? (await createConversation());
+    setConversationId(activeConversationId);
+
+    const userMessageId = await createMessage({
+      conversationId: activeConversationId,
+      content: transcription,
+    });
 
     setMessages((messages) => [
       ...messages,
@@ -87,8 +133,8 @@ function Chat() {
       },
     ]);
 
-    const responsePromise = getResponse(transcription);
-    const processPromise = processSentence(transcription);
+    const responsePromise = getResponse(userMessageId);
+    const processPromise = processSentence(userMessageId);
 
     const assistantResponse = await responsePromise;
 
@@ -224,27 +270,61 @@ function Chat() {
   const submittedTestPrompt = useRef(false);
 
   useEffect(() => {
-    const prompt = import.meta.env.VITE_SUBMIT_TEST_PROMPT?.trim();
+  const prompt = import.meta.env.VITE_SUBMIT_TEST_PROMPT?.trim();
 
-    if (!prompt || submittedTestPrompt.current) {
-      return;
-    }
-    submittedTestPrompt.current = true;
-    setFirstChat(false);
+  if (!prompt || submittedTestPrompt.current) {
+    return;
+  }
 
-    setMessages([{ id: crypto.randomUUID(), text: prompt, sender: "user" }]);
+  submittedTestPrompt.current = true;
 
-    void getResponse(prompt)
-      .then((text) => {
-        setMessages((messages) => [
-          ...messages,
-          { id: crypto.randomUUID(), text, sender: "assistant" },
-        ]);
-      })
-      .catch((error) => {
-        console.error("Could not generate test response", error);
+  async function submitTestPrompt() {
+    try {
+      const activeConversationId =
+        conversationId ?? await createConversation();
+
+      setConversationId(activeConversationId);
+
+      const userMessageId = await createMessage({
+        conversationId: activeConversationId,
+        content: prompt,
       });
-  }, []);
+
+      setFirstChat(false);
+      setMessages([
+        { id: userMessageId, text: prompt, sender: "user" },
+      ]);
+
+      const responsePromise = getResponse(userMessageId);
+      const processPromise = processSentence(userMessageId);
+
+      const assistantText = await responsePromise;
+
+      setMessages((messages) => [
+        ...messages,
+        {
+          id: crypto.randomUUID(),
+          text: assistantText,
+          sender: "assistant",
+        },
+      ]);
+
+      const correction = await processPromise;
+
+      setMessages((messages) =>
+        messages.map((message) =>
+          message.id === userMessageId
+            ? { ...message, correction }
+            : message,
+        ),
+      );
+    } catch (error) {
+      console.error("Could not submit test prompt", error);
+    }
+  }
+
+  void submitTestPrompt();
+}, []);
 
   return (
     <>

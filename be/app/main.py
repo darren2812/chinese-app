@@ -5,15 +5,18 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import OpenAI
+from uuid import UUID
 
 load_dotenv()
 
 from .schemas import (
-    ChatRequest,
+    MessageIdRequest,
     HoverRequest,
     ProcessedSentence,
     SelectionAnalysis,
     VocabSource,
+    Role,
+    CreateMessageRequest,
 )
 from .auth import require_user
 from .database import supabase
@@ -30,6 +33,55 @@ app.add_middleware(
     allow_methods=["POST"],
     allow_headers=["*"],
 )
+
+
+def get_user_message(message_id: UUID, user_id: str) -> dict:
+    result = (
+        supabase.table("messages")
+        .select("id, conversation_id, user_id, role, content")
+        .eq("id", str(message_id))
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+
+    if not isinstance(result.data, dict):
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if result.data["role"] != "user":
+        raise HTTPException(
+            status_code=400,
+            detail="Responses can only be generated from user messages.",
+        )
+
+    return result.data
+
+
+@app.post("/messages")
+def create_message(request: CreateMessageRequest, claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
+    insert_result = (
+        supabase.table("messages")
+        .insert(
+            {
+                "conversation_id": str(request.conversation_id),
+                "user_id": user_id,
+                "role": Role.USER.value,
+                "content": request.content,
+            }
+        )
+        .execute()
+    )
+
+    if not insert_result.data:
+        raise HTTPException(status_code=500, detail="Message was not returned.")
+
+    message = insert_result.data[0]
+
+    if not isinstance(message, dict) or not isinstance(message.get("id"), str):
+        raise HTTPException(status_code=500, detail="Message has no valid ID.")
+
+    return {"id": message["id"]}
 
 
 @app.post("/transcribe")
@@ -61,8 +113,11 @@ def transcribe(file: UploadFile = File(...)):
 
 
 @app.post("/respond")
-def respond(request: ChatRequest, claims: dict = Depends(require_user)):
+def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
     try:
+        user_id = claims["sub"]
+        message = get_user_message(request.message_id, user_id)
+
         response = client.responses.create(
             model="gpt-4o-mini",
             instructions=(
@@ -70,18 +125,27 @@ def respond(request: ChatRequest, claims: dict = Depends(require_user)):
                 "The learner may mix English words into Chinese sentences. "
                 "Understand the intended meaning and continue the conversation naturally in simplified Mandarin. "
             ),
-            input=request.message,
+            input=message["content"],
         )
 
-        text = response.output_text
+        assistant_text = response.output_text
 
-        if not text.strip():
+        if not assistant_text.strip():
             raise HTTPException(
                 status_code=502,
                 detail="The model returned an empty response.",
             )
 
-        return {"text": text}
+        supabase.table("messages").insert(
+            {
+                "conversation_id": message["conversation_id"],
+                "user_id": user_id,
+                "role": Role.ASSISTANT.value,
+                "content": assistant_text,
+            }
+        ).execute()
+
+        return {"text": assistant_text}
 
     except HTTPException:
         raise
@@ -94,9 +158,10 @@ def respond(request: ChatRequest, claims: dict = Depends(require_user)):
 
 
 @app.post("/process")
-def process(request: ChatRequest, claims: dict = Depends(require_user)):
+def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
     try:
         user_id = claims["sub"]
+        message = get_user_message(request.message_id, user_id)
 
         response = client.responses.parse(
             model="gpt-4o-mini",
@@ -119,7 +184,7 @@ def process(request: ChatRequest, claims: dict = Depends(require_user)):
                 7. If there is no meaningful grammar issue, return null for the grammar note.
                 8. If no grammar issues or English words in the transcript, return null for the corrected sentence.
                 """,
-            input=request.message,
+            input=message["content"],
             text_format=ProcessedSentence,
         )
 
@@ -131,7 +196,7 @@ def process(request: ChatRequest, claims: dict = Depends(require_user)):
                 detail="The response could not be processed.",
             )
 
-        rows = [
+        learning_item_rows = [
             {
                 "user_id": user_id,
                 "english": component.english,
@@ -143,11 +208,14 @@ def process(request: ChatRequest, claims: dict = Depends(require_user)):
             for component in result.components
         ]
 
-        if rows:
+        if learning_item_rows:
             supabase.table("learning_items").upsert(
-                rows,
+                learning_item_rows,
                 on_conflict="user_id,english,mandarin",
             ).execute()
+            supabase.table("messages").update(
+                {"correction": result.model_dump(mode="json")}
+            ).eq("id", str(request.message_id)).eq("user_id", user_id)
 
         return result
 
@@ -207,3 +275,33 @@ def explain_selection(request: HoverRequest):
             status_code=502,
             detail="Unable to process the sentence right now.",
         ) from exc
+
+
+@app.post("/conversations")
+def create_conversation(claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
+
+    insert_result = (
+        supabase.table("conversations").insert({"user_id": user_id}).execute()
+    )
+    if not insert_result.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Conversation was created but Supabase did not return it.",
+        )
+
+    conversation = insert_result.data[0]
+    if not isinstance(conversation, dict):
+        raise HTTPException(
+            status_code=500,
+            detail="Supabase returned an unexpected conversation format.",
+        )
+
+    conversation_id = conversation.get("id")
+    if not isinstance(conversation_id, str):
+        raise HTTPException(
+            status_code=500,
+            detail="Created conversation has no valid ID.",
+        )
+
+    return {"id": conversation_id}
