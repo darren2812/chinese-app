@@ -30,7 +30,7 @@ client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -60,32 +60,43 @@ def get_user_message(message_id: UUID, user_id: str) -> dict:
 @app.post("/messages")
 def create_message(request: CreateMessageRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
-    insert_result = (
-        supabase.table("messages")
-        .insert(
-            {
-                "conversation_id": str(request.conversation_id),
-                "user_id": user_id,
-                "role": Role.USER.value,
-                "content": request.content,
-            }
+    try:
+        insert_result = (
+            supabase.table("messages")
+            .insert(
+                {
+                    "conversation_id": str(request.conversation_id),
+                    "user_id": user_id,
+                    "role": Role.USER.value,
+                    "content": request.content,
+                }
+            )
+            .execute()
         )
-        .execute()
-    )
 
-    if not insert_result.data:
-        raise HTTPException(status_code=500, detail="Message was not returned.")
+        if not insert_result.data:
+            raise HTTPException(status_code=500, detail="Message was not returned.")
 
-    message = insert_result.data[0]
+        message = insert_result.data[0]
 
-    if not isinstance(message, dict) or not isinstance(message.get("id"), str):
-        raise HTTPException(status_code=500, detail="Message has no valid ID.")
+        if not isinstance(message, dict) or not isinstance(message.get("id"), str):
+            raise HTTPException(status_code=500, detail="Message has no valid ID.")
 
-    return {"id": message["id"]}
+        return {"id": message["id"]}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to create message for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to create the message right now.",
+        ) from exc
 
 
 @app.post("/transcribe")
-def transcribe(file: UploadFile = File(...)):
+def transcribe(file: UploadFile = File(...), claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
     try:
         transcription = client.audio.transcriptions.create(
             model="gpt-4o-mini-transcribe",
@@ -102,7 +113,8 @@ def transcribe(file: UploadFile = File(...)):
         raise
     except Exception as exc:
         logger.exception(
-            "Transcription failed (filename=%r, content_type=%r)",
+            "Transcription failed for user %s (filename=%r, content_type=%r)",
+            user_id,
             file.filename,
             file.content_type,
         )
@@ -114,8 +126,8 @@ def transcribe(file: UploadFile = File(...)):
 
 @app.post("/respond")
 def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
     try:
-        user_id = claims["sub"]
         message = get_user_message(request.message_id, user_id)
 
         response = client.responses.create(
@@ -150,7 +162,7 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Response generation failed")
+        logger.exception("Response generation failed for user %s", user_id)
         raise HTTPException(
             status_code=502,
             detail="Unable to generate a response right now.",
@@ -159,8 +171,8 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
 
 @app.post("/process")
 def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
     try:
-        user_id = claims["sub"]
         message = get_user_message(request.message_id, user_id)
 
         response = client.responses.parse(
@@ -222,7 +234,7 @@ def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Sentence processing failed")
+        logger.exception("Sentence processing failed for user %s", user_id)
         raise HTTPException(
             status_code=502,
             detail="Unable to process the sentence right now.",
@@ -230,7 +242,8 @@ def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
 
 
 @app.post("/explain-selection")
-def explain_selection(request: HoverRequest):
+def explain_selection(request: HoverRequest, claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
     try:
         response = client.responses.parse(
             model="gpt-4o-mini",
@@ -270,7 +283,7 @@ def explain_selection(request: HoverRequest):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Sentence processing failed")
+        logger.exception("Selection explanation failed for user %s", user_id)
         raise HTTPException(
             status_code=502,
             detail="Unable to process the sentence right now.",
@@ -280,28 +293,68 @@ def explain_selection(request: HoverRequest):
 @app.post("/conversations")
 def create_conversation(claims: dict = Depends(require_user)):
     user_id = claims["sub"]
+    try:
+        insert_result = (
+            supabase.table("conversations").insert({"user_id": user_id}).execute()
+        )
+        if not insert_result.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Conversation was created but Supabase did not return it.",
+            )
 
-    insert_result = (
-        supabase.table("conversations").insert({"user_id": user_id}).execute()
-    )
-    if not insert_result.data:
+        conversation = insert_result.data[0]
+        if not isinstance(conversation, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected conversation format.",
+            )
+
+        conversation_id = conversation.get("id")
+        if not isinstance(conversation_id, str):
+            raise HTTPException(
+                status_code=500,
+                detail="Created conversation has no valid ID.",
+            )
+
+        return {"id": conversation_id}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to create conversation for user %s", user_id)
         raise HTTPException(
-            status_code=500,
-            detail="Conversation was created but Supabase did not return it.",
+            status_code=502,
+            detail="Unable to create a conversation right now.",
+        ) from exc
+
+
+@app.get("/conversations")
+def get_conversations(claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
+    try:
+
+        result = (
+            supabase.table("conversations")
+            .select("id, title, created_at, updated_at")
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
+            .execute()
         )
 
-    conversation = insert_result.data[0]
-    if not isinstance(conversation, dict):
-        raise HTTPException(
-            status_code=500,
-            detail="Supabase returned an unexpected conversation format.",
-        )
+        if not isinstance(result.data, list):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected conversations format.",
+            )
 
-    conversation_id = conversation.get("id")
-    if not isinstance(conversation_id, str):
-        raise HTTPException(
-            status_code=500,
-            detail="Created conversation has no valid ID.",
-        )
+        return result.data
 
-    return {"id": conversation_id}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch conversations for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to fetch conversations right now.",
+        ) from exc
