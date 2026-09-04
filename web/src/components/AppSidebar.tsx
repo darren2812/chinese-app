@@ -27,7 +27,7 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
       <nav className="app-sidebar__nav" aria-label="Main navigation">
         <NavLink
-          to="/app"
+          to="/chat"
           end
           className={({ isActive }) =>
             `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
@@ -41,7 +41,7 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
             <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5c-1.2 0-2.34-.28-3.35-.78L4 20l1.78-4.56A7.47 7.47 0 0 1 5 11.5a7.5 7.5 0 1 1 15 0Z" />
             <path d="M9 11.5h.01M12.5 11.5h.01M16 11.5h.01" />
           </svg>
-          <span className="app-sidebar__label">Chat</span>
+          <span className="app-sidebar__label">New Chat</span>
         </NavLink>
 
         <NavLink

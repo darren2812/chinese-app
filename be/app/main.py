@@ -96,8 +96,6 @@ def create_conversation(claims: dict = Depends(require_user)):
         ) from exc
 
 
-
-
 @app.get("/conversations")
 def get_conversations(claims: dict = Depends(require_user)):
     user_id = claims["sub"]
@@ -251,6 +249,7 @@ def update_conversation(
             detail="Unable to update the conversation right now.",
         ) from exc
 
+
 @app.post("/messages")
 def create_message(request: CreateMessageRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
@@ -312,16 +311,33 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
                 detail="The model returned an empty response.",
             )
 
-        supabase.table("messages").insert(
-            {
-                "conversation_id": message["conversation_id"],
-                "user_id": user_id,
-                "role": Role.ASSISTANT.value,
-                "content": assistant_text,
-            }
-        ).execute()
+        result = (
+            supabase.table("messages")
+            .insert(
+                {
+                    "conversation_id": message["conversation_id"],
+                    "user_id": user_id,
+                    "role": Role.ASSISTANT.value,
+                    "content": assistant_text,
+                }
+            )
+            .execute()
+        )
 
-        return {"text": assistant_text}
+        if not isinstance(result.data, list) or not result.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Assistant message was not returned.",
+            )
+
+        assistant_message = result.data[0]
+        if not isinstance(assistant_message, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected response format.",
+            )
+
+        return assistant_message
 
     except HTTPException:
         raise
@@ -347,18 +363,18 @@ def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
                 Return concise learning feedback for this single message only.
 
                 Your goals:
-                1. Create a BaseComponent item only for one or more English words and determine whether it is 
+                1. IF THERE ARE NO ENGLISH WORDS IN TRANSCRIPT, RETURN EMPTY VOCAB LIST.
+                2. Create a BaseComponent item only for one or more English words and determine whether it is 
                 a vocab item, grammar, phrase, or clause.
-                2. Copy that exact text into the `english` field. Do not conjugate, paraphrase,
+                3. Copy that exact text into the `english` field. Do not conjugate, paraphrase,
                 infer, translate, or add English words.
-                3. Never create BaseComponents from the corrected sentence or grammar explanation.
-                4. For each English word or phrase, provide:
+                4. Never create BaseComponents from the corrected sentence or grammar explanation.
+                5. For each English word or phrase, provide:
                     - a natural Chinese equivalent
                     - pinyin
-                5. Identify at most one important grammar issue, only if there is a meaningful issue. Output in English.
-                6. If there are no English words in the transcript, return an empty vocabulary list.
+                6. Identify at most one important grammar issue, only if there is a meaningful issue. Output in English.
                 7. If there is no meaningful grammar issue, return null for the grammar note.
-                8. If no grammar issues or English words in the transcript, return null for the corrected sentence.
+                8. If no grammar issues in the transcript, return null for the corrected sentence.
                 """,
             input=message["content"],
             text_format=ProcessedSentence,
@@ -391,7 +407,7 @@ def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
             ).execute()
             supabase.table("messages").update(
                 {"correction": result.model_dump(mode="json")}
-            ).eq("id", str(request.message_id)).eq("user_id", user_id)
+            ).eq("id", str(request.message_id)).eq("user_id", user_id).execute()
 
         return result
 

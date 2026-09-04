@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import ChatBubble from "../components/ChatBubble";
 import "./App.css";
 import { apiFetch } from "../lib/api";
+import { useParams, useNavigate } from "react-router";
 
 export type BaseComponent = {
   type: "vocab" | "grammar" | "phrase" | "clause";
@@ -24,6 +25,13 @@ type Message = {
   selectionAnalysis?: SelectionAnalysis;
 };
 
+type StoredMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  correction: ProcessResult | null;
+};
+
 export type ProcessResult = {
   components: BaseComponent[];
   corrected_sentence: string;
@@ -41,9 +49,10 @@ function Chat() {
   const audioChunksRef = useRef<Blob[]>([]);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const { conversationId } = useParams();
+  const navigate = useNavigate();
 
-  async function getResponse(userMessageId: string): Promise<string> {
+  async function getResponse(userMessageId: string): Promise<StoredMessage> {
     const response = await apiFetch("/respond", {
       method: "POST",
       headers: {
@@ -56,11 +65,13 @@ function Chat() {
       throw new Error("Could not generate response");
     }
 
-    const data: { text: string } = await response.json();
-    return data.text;
+    const data = await response.json();
+    return data;
   }
 
-  async function processSentence(userMessageId: string): Promise<ProcessResult> {
+  async function processSentence(
+    userMessageId: string,
+  ): Promise<ProcessResult> {
     const response = await apiFetch("/process", {
       method: "POST",
       headers: {
@@ -116,8 +127,12 @@ function Chat() {
   async function handleRecordedAudio(audioBlob: Blob) {
     const transcription = await sendAudioForTranscription(audioBlob);
 
-    const activeConversationId = conversationId ?? (await createConversation());
-    setConversationId(activeConversationId);
+    let activeConversationId = conversationId;
+
+    if (!activeConversationId) {
+      activeConversationId = await createConversation();
+      navigate(`/chat/${activeConversationId}`, { replace: true });
+    }
 
     const userMessageId = await createMessage({
       conversationId: activeConversationId,
@@ -141,9 +156,9 @@ function Chat() {
     setMessages((messages) => [
       ...messages,
       {
-        id: crypto.randomUUID(),
-        text: assistantResponse,
-        sender: "assistant",
+        id: assistantResponse.id,
+        text: assistantResponse.content,
+        sender: assistantResponse.role,
       },
     ]);
 
@@ -270,61 +285,81 @@ function Chat() {
   const submittedTestPrompt = useRef(false);
 
   useEffect(() => {
-  const prompt = import.meta.env.VITE_SUBMIT_TEST_PROMPT?.trim();
+    /*
+    const prompt = import.meta.env.VITE_SUBMIT_TEST_PROMPT?.trim();
 
-  if (!prompt || submittedTestPrompt.current) {
-    return;
-  }
-
-  submittedTestPrompt.current = true;
-
-  async function submitTestPrompt() {
-    try {
-      const activeConversationId =
-        conversationId ?? await createConversation();
-
-      setConversationId(activeConversationId);
-
-      const userMessageId = await createMessage({
-        conversationId: activeConversationId,
-        content: prompt,
-      });
-
-      setFirstChat(false);
-      setMessages([
-        { id: userMessageId, text: prompt, sender: "user" },
-      ]);
-
-      const responsePromise = getResponse(userMessageId);
-      const processPromise = processSentence(userMessageId);
-
-      const assistantText = await responsePromise;
-
-      setMessages((messages) => [
-        ...messages,
-        {
-          id: crypto.randomUUID(),
-          text: assistantText,
-          sender: "assistant",
-        },
-      ]);
-
-      const correction = await processPromise;
-
-      setMessages((messages) =>
-        messages.map((message) =>
-          message.id === userMessageId
-            ? { ...message, correction }
-            : message,
-        ),
-      );
-    } catch (error) {
-      console.error("Could not submit test prompt", error);
+    if (!prompt || submittedTestPrompt.current) {
+      return;
     }
-  }
 
-  void submitTestPrompt();
-}, []);
+    submittedTestPrompt.current = true;
+
+    async function submitTestPrompt() {
+      try {
+        const activeConversationId =
+          conversationId ?? (await createConversation());
+
+        setConversationId(activeConversationId);
+
+        const userMessageId = await createMessage({
+          conversationId: activeConversationId,
+          content: prompt,
+        });
+
+        setFirstChat(false);
+        setMessages([{ id: userMessageId, text: prompt, sender: "user" }]);
+
+        const responsePromise = getResponse(userMessageId);
+        const processPromise = processSentence(userMessageId);
+
+        const assistantText = await responsePromise;
+
+        setMessages((messages) => [
+          ...messages,
+          {
+            id: crypto.randomUUID(),
+            text: assistantText,
+            sender: "assistant",
+          },
+        ]);
+
+        const correction = await processPromise;
+
+        setMessages((messages) =>
+          messages.map((message) =>
+            message.id === userMessageId ? { ...message, correction } : message,
+          ),
+        );
+      } catch (error) {
+        console.error("Could not submit test prompt", error);
+      }
+    }
+
+    void submitTestPrompt();
+    */
+
+    if (!conversationId) return;
+
+    async function loadConversation() {
+      const response = await apiFetch(
+        `/conversations/${conversationId}/messages`,
+      );
+      if (!response.ok) throw new Error("Could not load conversation");
+
+      const stored: StoredMessage[] = await response.json();
+
+      setMessages(
+        stored.map((message) => ({
+          id: message.id,
+          text: message.content,
+          sender: message.role,
+        })),
+      );
+      setFirstChat(stored.length === 0);
+    }
+
+    void loadConversation();
+  }, [conversationId]);
 
   return (
     <>
