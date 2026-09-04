@@ -358,3 +358,126 @@ def get_conversations(claims: dict = Depends(require_user)):
             status_code=502,
             detail="Unable to fetch conversations right now.",
         ) from exc
+
+
+@app.get("/conversations/{conversation_id}/messages")
+def get_conversation_messages(
+    conversation_id: UUID,
+    claims: dict = Depends(require_user),
+):
+    user_id = claims["sub"]
+
+    try:
+        conversation_result = (
+            supabase.table("conversations")
+            .select("id")
+            .eq("id", str(conversation_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not conversation_result.data:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found.",
+            )
+
+        result = (
+            supabase.table("messages")
+            .select("id, conversation_id, role, content, correction, created_at")
+            .eq("conversation_id", str(conversation_id))
+            .eq("user_id", user_id)
+            .order("created_at")
+            .execute()
+        )
+
+        if not isinstance(result.data, list):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected messages format.",
+            )
+
+        return result.data
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Failed to fetch messages for conversation %s and user %s",
+            conversation_id,
+            user_id,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to fetch conversation messages right now.",
+        ) from exc
+
+
+@app.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: UUID,
+    claims: dict = Depends(require_user),
+):
+    user_id = claims["sub"]
+
+    try:
+        conversation_result = (
+            supabase.table("conversations")
+            .delete()
+            .eq("id", str(conversation_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not conversation_result.data:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found.",
+            )
+
+        return {"id": str(conversation_id), "deleted": True}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Failed to delete conversation %s for user %s",
+            conversation_id,
+            user_id,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to delete conversation right now.",
+        ) from exc
+
+
+@app.patch("/conversations/{conversation_id}")
+def update_conversation(
+    conversation_id: UUID,
+    title: str,
+    claims: dict = Depends(require_user),
+):
+    user_id = claims["sub"]
+
+    try:
+        result = (
+            supabase.table("conversations")
+            .update({"title": title})
+            .eq("id", str(conversation_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+
+        return result.data[0]
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to update conversation for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to update the conversation right now.",
+        ) from exc
