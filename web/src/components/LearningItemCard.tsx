@@ -1,3 +1,5 @@
+import "./LearningItemCard.css";
+
 export type LearningItem = {
   id: string;
   english: string;

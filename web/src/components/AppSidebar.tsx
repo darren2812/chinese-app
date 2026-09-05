@@ -1,6 +1,7 @@
 import { NavLink, useNavigate, useParams } from "react-router";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
+import "./AppSidebar.css";
 
 type AppSidebarProps = {
   isOpen: boolean;

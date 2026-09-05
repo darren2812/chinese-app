@@ -6,7 +6,7 @@ import type {
   StartingLanguage,
 } from "../components/LearningItemCard";
 import { apiFetch } from "../lib/api";
-import "./App.css";
+import "./LearningItems.css";
 
 export default function LearningItems() {
   const [learningItems, setLearningItems] = useState<LearningItem[]>([]);

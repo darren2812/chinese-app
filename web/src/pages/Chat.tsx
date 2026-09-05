@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import ChatBubble from "../components/ChatBubble";
-import "./App.css";
+import "./Chat.css";
 import { apiFetch } from "../lib/api";
 import { useParams, useNavigate } from "react-router";
 

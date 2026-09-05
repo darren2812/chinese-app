@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./ChatBubble.css";
 import type {
   BaseComponent,
   ProcessResult,

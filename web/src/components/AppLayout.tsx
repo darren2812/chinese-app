@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet } from "react-router";
 import AppSidebar from "./AppSidebar";
+import "./AppLayout.css";
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);

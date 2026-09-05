@@ -1,5 +1,6 @@
 import LearningItemCard from "./LearningItemCard";
 import type { LearningItem, StartingLanguage } from "./LearningItemCard";
+import "./LearningItemSection.css";
 
 type LearningItemSectionProps = {
   title: string;
