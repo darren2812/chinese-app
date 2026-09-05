@@ -1,149 +1,14 @@
 import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import LearningItemSection from "../components/LearningItemSection";
+import type {
+  LearningItem,
+  StartingLanguage,
+} from "../components/LearningItemCard";
 import { apiFetch } from "../lib/api";
 import "./App.css";
 
-type LearningItem = {
-  id: string;
-  english: string;
-  mandarin: string;
-  pinyin: string;
-  type: "vocab" | "grammar" | "phrase" | "clause";
-  source: "detected" | "user" | "assistant";
-  created_at: string;
-};
-
-type StartingLanguage = "english" | "mandarin";
-
-type VocabularyCardProps = {
-  item: LearningItem;
-  flipped: boolean;
-  pinyinVisible: boolean;
-  startingLanguage: StartingLanguage;
-  onFlip: () => void;
-  onTogglePinyin: () => void;
-};
-
-function VocabularyCard({
-  item,
-  flipped,
-  pinyinVisible,
-  startingLanguage,
-  onFlip,
-  onTogglePinyin,
-}: VocabularyCardProps) {
-  const frontIsMandarin = startingLanguage === "mandarin";
-  const activeSide = flipped ? "back" : "front";
-
-  function renderFace(side: "front" | "back", isMandarin: boolean) {
-    const isActive = activeSide === side;
-    const faceText = isMandarin ? item.mandarin : item.english;
-
-    return (
-      <div
-        className={`vocabulary-card__face vocabulary-card__face--${side}`}
-        aria-hidden={!isActive}
-      >
-        <button
-          type="button"
-          className="vocabulary-card__flip-button"
-          onClick={onFlip}
-          tabIndex={isActive ? 0 : -1}
-          aria-label={`${faceText}. Flip card to show ${
-            isMandarin ? "English" : "Mandarin"
-          }`}
-        >
-          <span
-            className={
-              isMandarin
-                ? "vocabulary-card__hanzi"
-                : "vocabulary-card__english"
-            }
-          >
-            {faceText}
-          </span>
-
-          {isMandarin && pinyinVisible && (
-            <span className="vocabulary-card__pinyin">{item.pinyin}</span>
-          )}
-        </button>
-
-        {isMandarin && isActive && (
-          <button
-            type="button"
-            className="vocabulary-card__pinyin-toggle"
-            onClick={onTogglePinyin}
-            tabIndex={isActive ? 0 : -1}
-            aria-pressed={pinyinVisible}
-          >
-            {pinyinVisible ? "Hide pinyin" : "Show pinyin"}
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <article
-      className={`vocabulary-card${
-        flipped ? " vocabulary-card--flipped" : ""
-      }`}
-    >
-      <div className="vocabulary-card__inner">
-        {renderFace("front", frontIsMandarin)}
-        {renderFace("back", !frontIsMandarin)}
-      </div>
-    </article>
-  );
-}
-
-type VocabularySectionProps = {
-  title: string;
-  emptyMessage: string;
-  items: LearningItem[];
-  flippedIds: Set<string>;
-  pinyinIds: Set<string>;
-  startingLanguage: StartingLanguage;
-  onFlip: (id: string) => void;
-  onTogglePinyin: (id: string) => void;
-};
-
-function VocabularySection({
-  title,
-  emptyMessage,
-  items,
-  flippedIds,
-  pinyinIds,
-  startingLanguage,
-  onFlip,
-  onTogglePinyin,
-}: VocabularySectionProps) {
-  return (
-    <section className="vocabulary-section">
-      <h2>{title}</h2>
-
-      {items.length > 0 ? (
-        <div className="vocabulary-grid">
-          {items.map((item) => (
-            <VocabularyCard
-              key={item.id}
-              item={item}
-              flipped={flippedIds.has(item.id)}
-              pinyinVisible={pinyinIds.has(item.id)}
-              startingLanguage={startingLanguage}
-              onFlip={() => onFlip(item.id)}
-              onTogglePinyin={() => onTogglePinyin(item.id)}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="vocabulary-section__empty">{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
-export default function Vocabulary() {
+export default function LearningItems() {
   const [learningItems, setLearningItems] = useState<LearningItem[]>([]);
   const [startingLanguage, setStartingLanguage] =
     useState<StartingLanguage>("english");
@@ -238,7 +103,7 @@ export default function Vocabulary() {
 
       {loading ? (
         <p className="learning-items-page__status" role="status">
-          Loading your vocabulary…
+          Loading your learning items…
         </p>
       ) : error ? (
         <p className="learning-items-page__status learning-items-page__status--error">
@@ -246,9 +111,9 @@ export default function Vocabulary() {
         </p>
       ) : (
         <div className="learning-items-page__sections">
-          <VocabularySection
+          <LearningItemSection
             title="Detected from your conversations"
-            emptyMessage="New vocabulary detected in your conversations will appear here."
+            emptyMessage="New learning items detected in your conversations will appear here."
             items={detectedItems}
             flippedIds={flippedIds}
             pinyinIds={pinyinIds}
@@ -257,9 +122,9 @@ export default function Vocabulary() {
             onTogglePinyin={(id) => toggleId(id, setPinyinIds)}
           />
 
-          <VocabularySection
+          <LearningItemSection
             title="Your list"
-            emptyMessage="Vocabulary you save will appear here."
+            emptyMessage="Learning items you save will appear here."
             items={userItems}
             flippedIds={flippedIds}
             pinyinIds={pinyinIds}

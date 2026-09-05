@@ -109,7 +109,7 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
         </NavLink>
 
         <NavLink
-          to="/app/vocabulary"
+          to="/app/learning-items"
           className={({ isActive }) =>
             `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
           }

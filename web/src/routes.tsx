@@ -3,7 +3,7 @@ import AppLayout from "./components/AppLayout";
 import Chat from "./pages/Chat";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
-import Vocabulary from "./pages/Vocabulary";
+import LearningItems from "./pages/LearningItems";
 
 export const router = createBrowserRouter([
   {
@@ -27,8 +27,8 @@ export const router = createBrowserRouter([
         Component: Chat,
       },
       {
-        path: "vocabulary",
-        Component: Vocabulary,
+        path: "learning-items",
+        Component: LearningItems,
       },
       {
         path: "chat/:conversationId",
