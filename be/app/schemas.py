@@ -46,8 +46,8 @@ class HoverRequest(BaseModel):
 
 class VocabSource(str, Enum):
     DETECTED = "detected"
-    USER_MANDARIN = "user_mandarin"
-    USER_ENGLISH = "user_english"
+    MANUAL_USER = "user"
+    MANUAL_ASSISTANT = "assistant"
 
 
 class Role(str, Enum):
@@ -58,3 +58,7 @@ class Role(str, Enum):
 class CreateMessageRequest(BaseModel):
     conversation_id: str
     content: str
+
+
+class CreateLearningItemRequest(BaseComponent):
+    source: VocabSource

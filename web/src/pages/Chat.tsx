@@ -282,7 +282,7 @@ function Chat() {
     return data.text;
   }
 
-  const submittedTestPrompt = useRef(false);
+  // const submittedTestPrompt = useRef(false);
 
   useEffect(() => {
     /*

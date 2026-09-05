@@ -17,6 +17,7 @@ from .schemas import (
     VocabSource,
     Role,
     CreateMessageRequest,
+    CreateLearningItemRequest,
 )
 from .auth import require_user
 from .database import supabase
@@ -410,6 +411,7 @@ def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
             supabase.table("learning_items").upsert(
                 learning_item_rows,
                 on_conflict="user_id,english,mandarin",
+                ignore_duplicates=True,
             ).execute()
             supabase.table("messages").update(
                 {"correction": result.model_dump(mode="json")}
@@ -461,7 +463,7 @@ def explain_selection(request: HoverRequest, claims: dict = Depends(require_user
         if result is None:
             raise HTTPException(
                 status_code=502,
-                detail="The response could not be processed.",
+                detail="The selection could not be processed.",
             )
 
         return result
@@ -472,7 +474,102 @@ def explain_selection(request: HoverRequest, claims: dict = Depends(require_user
         logger.exception("Selection explanation failed for user %s", user_id)
         raise HTTPException(
             status_code=502,
-            detail="Unable to process the sentence right now.",
+            detail="Unable to process the selection right now.",
+        ) from exc
+
+
+@app.get("/learning-items")
+def get_learning_items(claims: dict = Depends(require_user)):
+    user_id = claims["sub"]
+
+    try:
+        result = (
+            supabase.table("learning_items")
+            .select("id, english, mandarin, pinyin, type, source, created_at")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        if not isinstance(result.data, list):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected learning items format.",
+            )
+
+        return result.data
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch learning items for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to fetch learning items right now.",
+        ) from exc
+
+
+@app.post("/learning-items")
+def add_learning_item(
+    item: CreateLearningItemRequest, claims: dict = Depends(require_user)
+):
+
+    user_id = claims["sub"]
+
+    try:
+        result = (
+            supabase.table("learning_items")
+            .upsert(
+                {
+                    "user_id": user_id,
+                    "english": item.english,
+                    "mandarin": item.mandarin,
+                    "pinyin": item.pinyin,
+                    "type": item.type.value,
+                    "source": item.source.value,
+                },
+                on_conflict="user_id,english,mandarin",
+                ignore_duplicates=False,
+            )
+            .execute()
+        )
+
+        return result.data[0]
+
+    except Exception as exc:
+        logger.exception("Failed to add learning item for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to add the learning item right now.",
+        ) from exc
+
+
+@app.delete("/learning-items/{item_id}")
+def delete_learning_item(item_id: UUID, claims: dict = Depends(require_user)):
+
+    user_id = claims["sub"]
+
+    try:
+        result = (
+            supabase.table("learning_items")
+            .delete()
+            .eq("id", str(item_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Learning item not found.")
+
+        return {"id": str(item_id), "deleted": True}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to delete learning item for user %s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to delete the learning item right now.",
         ) from exc
 
 
