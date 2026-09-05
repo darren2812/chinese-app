@@ -91,6 +91,12 @@
   transition: opacity 100ms ease;
 }
 
+.app-sidebar__conversation-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-sidebar:not(.app-sidebar--open) .app-sidebar__toggle,
 .app-sidebar:not(.app-sidebar--open) .app-sidebar__link {
   justify-content: center;

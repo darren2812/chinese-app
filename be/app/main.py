@@ -275,6 +275,12 @@ def create_message(request: CreateMessageRequest, claims: dict = Depends(require
         if not isinstance(message, dict) or not isinstance(message.get("id"), str):
             raise HTTPException(status_code=500, detail="Message has no valid ID.")
 
+        title = " ".join(request.content.split())[:100]
+
+        supabase.table("conversations").update({"title": title}).eq(
+            "id", str(request.conversation_id)
+        ).eq("user_id", user_id).is_("title", "null").execute()
+
         return {"id": message["id"]}
 
     except HTTPException:

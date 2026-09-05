@@ -94,12 +94,15 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           {conversations.map((conversation) => (
             <NavLink
               key={conversation.id}
-              to={`/chat/${conversation.id}`}
+              to={`/app/chat/${conversation.id}`}
               className={({ isActive }) =>
                 `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
               }
             >
-              <span className="app-sidebar__label">
+              <span
+                className="app-sidebar__conversation-title"
+                title={conversation.title ?? "Untitled conversation"}
+              >
                 {conversation.title ?? "Untitled conversation"}
               </span>
             </NavLink>
