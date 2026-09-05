@@ -1,4 +1,4 @@
-import { NavLink, useParams } from "react-router";
+import { NavLink, useNavigate, useParams } from "react-router";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
 
@@ -17,8 +17,7 @@ type Conversation = {
 export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const { conversationId } = useParams();
-  const [updateConversations, setUpdateConversations] =
-    useState<boolean>(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function loadConversations() {
@@ -30,10 +29,9 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
       const result = await response.json();
 
       setConversations(result);
-      setUpdateConversations(false);
     }
     void loadConversations();
-  }, [conversationId, updateConversations]);
+  }, [conversationId]);
 
   async function renameConversation(conversation: Conversation) {
     const title = window.prompt("Conversation name:", conversation.title ?? "");
@@ -54,18 +52,22 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
     );
   }
 
-  async function deleteConversation(conversationId: string) {
+  async function deleteConversation(itemId: string) {
     if (!window.confirm("Delete this conversation?")) return;
 
-    const response = await apiFetch(`/conversations/${conversationId}`, {
+    const response = await apiFetch(`/conversations/${itemId}`, {
       method: "DELETE",
     });
 
     if (!response.ok) throw new Error("Could not delete conversation");
 
     setConversations((items) =>
-      items.filter((item) => item.id !== conversationId),
+      items.filter((item) => item.id !== itemId),
     );
+
+    if (conversationId === itemId) {
+      navigate("/app", { replace: true });
+    }
   }
 
   return (
