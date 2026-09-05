@@ -282,6 +282,23 @@ function Chat() {
     return data.text;
   }
 
+  async function addAsssitantItem(component: BaseComponent) {
+    const response = await apiFetch("/learning-items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...component,
+        source: "assistant",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not add learning item.");
+    }
+
+    return response.json();
+  }
+
   // const submittedTestPrompt = useRef(false);
 
   useEffect(() => {
@@ -382,6 +399,9 @@ function Chat() {
                   message.sender === "assistant"
                     ? handleAssistantSelection
                     : undefined
+                }
+                onAddItem={
+                  message.sender === "assistant" ? addAsssitantItem : undefined
                 }
               />
             ))

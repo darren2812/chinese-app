@@ -1,5 +1,9 @@
 import { useState } from "react";
-import type { ProcessResult, SelectionAnalysis } from "../pages/Chat";
+import type {
+  BaseComponent,
+  ProcessResult,
+  SelectionAnalysis,
+} from "../pages/Chat";
 
 type ChatBubbleProps = {
   text: string;
@@ -10,6 +14,7 @@ type ChatBubbleProps = {
     selection: string,
     sentence: string,
   ) => Promise<SelectionAnalysis>;
+  onAddItem?: (component: BaseComponent) => Promise<void>;
 };
 
 export default function ChatBubble({
@@ -17,6 +22,7 @@ export default function ChatBubble({
   sender,
   correction,
   onSelection,
+  onAddItem,
 }: ChatBubbleProps) {
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
   const [selectionAnalysis, setSelectionAnalysis] =
@@ -103,13 +109,21 @@ export default function ChatBubble({
         <>
           <div className="correction-card__section">
             {selectionAnalysis.components.map((component) => (
-              <>
+              <div
+                key={`${component.english}-${component.mandarin}-${component.type}`}
+              >
                 <h3 className="correction-card__heading">
                   {component.mandarin} - {component.pinyin}
                 </h3>
                 <strong>{component.english}</strong>
                 <span> {`(${component.type})`}</span>
-              </>
+                <button
+                  type="button"
+                  onClick={() => void onAddItem?.(component)}
+                >
+                  Add
+                </button>
+              </div>
             ))}
             <p>{selectionAnalysis.explanation}</p>
           </div>
