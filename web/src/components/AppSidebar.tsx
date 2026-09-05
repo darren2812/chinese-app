@@ -17,6 +17,8 @@ type Conversation = {
 export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const { conversationId } = useParams();
+  const [updateConversations, setUpdateConversations] =
+    useState<boolean>(false);
 
   useEffect(() => {
     async function loadConversations() {
@@ -28,9 +30,43 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
       const result = await response.json();
 
       setConversations(result);
+      setUpdateConversations(false);
     }
     void loadConversations();
-  }, [conversationId]);
+  }, [conversationId, updateConversations]);
+
+  async function renameConversation(conversation: Conversation) {
+    const title = window.prompt("Conversation name:", conversation.title ?? "");
+
+    if (!title?.trim()) return;
+
+    const response = await apiFetch(
+      `/conversations/${conversation.id}?title=${encodeURIComponent(title.trim())}`,
+      { method: "PATCH" },
+    );
+
+    if (!response.ok) throw new Error("Could not rename conversation");
+
+    const updated: Conversation = await response.json();
+
+    setConversations((items) =>
+      items.map((item) => (item.id === updated.id ? updated : item)),
+    );
+  }
+
+  async function deleteConversation(conversationId: string) {
+    if (!window.confirm("Delete this conversation?")) return;
+
+    const response = await apiFetch(`/conversations/${conversationId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) throw new Error("Could not delete conversation");
+
+    setConversations((items) =>
+      items.filter((item) => item.id !== conversationId),
+    );
+  }
 
   return (
     <aside className={`app-sidebar${isOpen ? " app-sidebar--open" : ""}`}>
@@ -92,20 +128,38 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           <h2 className="app-sidebar__section-heading">Recent Chats</h2>
 
           {conversations.map((conversation) => (
-            <NavLink
-              key={conversation.id}
-              to={`/app/chat/${conversation.id}`}
-              className={({ isActive }) =>
-                `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
-              }
-            >
-              <span
-                className="app-sidebar__conversation-title"
-                title={conversation.title ?? "Untitled conversation"}
+            <div className="conversation-item" key={conversation.id}>
+              <NavLink
+                to={`/app/chat/${conversation.id}`}
+                className={({ isActive }) =>
+                  `app-sidebar__link app-sidebar__conversation${
+                    isActive ? " app-sidebar__link--active" : ""
+                  }`
+                }
               >
-                {conversation.title ?? "Untitled conversation"}
-              </span>
-            </NavLink>
+                <span className="app-sidebar__conversation-title">
+                  {conversation.title ?? "Untitled conversation"}
+                </span>
+              </NavLink>
+
+              <div className="conversation-item__actions">
+                <button
+                  type="button"
+                  aria-label={`Rename ${conversation.title ?? "conversation"}`}
+                  onClick={() => void renameConversation(conversation)}
+                >
+                  Rename
+                </button>
+
+                <button
+                  type="button"
+                  aria-label={`Delete ${conversation.title ?? "conversation"}`}
+                  onClick={() => void deleteConversation(conversation.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           ))}
         </nav>
       )}

@@ -284,3 +284,34 @@
     padding: var(--space-m);
   }
 }
+
+.conversation-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-sidebar__conversation {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-sidebar__conversation-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-item__actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.conversation-item:hover .conversation-item__actions,
+.conversation-item:focus-within .conversation-item__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
