@@ -1,11 +1,37 @@
-import { NavLink } from "react-router";
+import { NavLink, useParams } from "react-router";
+import { use, useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
 
 type AppSidebarProps = {
   isOpen: boolean;
   onToggle: () => void;
 };
 
+type Conversation = {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const { conversationId } = useParams();
+
+  useEffect(() => {
+    async function loadConversations() {
+      const response = await apiFetch("/conversations");
+      if (!response.ok) {
+        throw new Error("Could not generate response");
+      }
+
+      const result = await response.json();
+
+      setConversations(result);
+    }
+    void loadConversations();
+  }, [conversationId]);
+
   return (
     <aside className={`app-sidebar${isOpen ? " app-sidebar--open" : ""}`}>
       <button
@@ -60,6 +86,26 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           <span className="app-sidebar__label">Learning Items</span>
         </NavLink>
       </nav>
+
+      {isOpen && (
+        <nav className="app-sidebar__recent" aria-label="Recent chats">
+          <h2 className="app-sidebar__section-heading">Recent Chats</h2>
+
+          {conversations.map((conversation) => (
+            <NavLink
+              key={conversation.id}
+              to={`/chat/${conversation.id}`}
+              className={({ isActive }) =>
+                `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
+              }
+            >
+              <span className="app-sidebar__label">
+                {conversation.title ?? "Untitled conversation"}
+              </span>
+            </NavLink>
+          ))}
+        </nav>
+      )}
     </aside>
   );
 }
