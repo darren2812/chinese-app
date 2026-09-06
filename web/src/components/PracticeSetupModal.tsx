@@ -9,7 +9,7 @@ export type PracticeSetup = {
 };
 
 type PracticeSetupModalProps = {
-  onStart: (setup: PracticeSetup) => void;
+  onStart: (setup: PracticeSetup) => Promise<void>;
 };
 
 export default function PracticeSetupModal({
@@ -23,6 +23,7 @@ export default function PracticeSetupModal({
   const [starter, setStarter] = useState<PracticeSetup["starter"]>("user");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,11 +68,19 @@ export default function PracticeSetupModal({
     });
   }
 
-  function start() {
-    onStart({
-      items: items.filter((item) => selectedIds.has(item.id)),
-      starter,
-    });
+  async function start() {
+    setStarting(true);
+    setError(null);
+
+    try {
+      await onStart({
+        items: items.filter((item) => selectedIds.has(item.id)),
+        starter,
+      });
+    } catch {
+      setError("Could not start a conversation. Please try again.");
+      setStarting(false);
+    }
   }
 
   return (
@@ -172,8 +181,13 @@ export default function PracticeSetupModal({
           <span aria-live="polite">
             {selectedIds.size} {selectedIds.size === 1 ? "word" : "words"} selected
           </span>
-          <button type="button" className="practice-modal__start" onClick={start}>
-            Start conversation
+          <button
+            type="button"
+            className="practice-modal__start"
+            onClick={() => void start()}
+            disabled={starting}
+          >
+            {starting ? "Starting…" : "Start conversation"}
           </button>
         </footer>
       </section>

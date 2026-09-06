@@ -49,7 +49,6 @@ function Chat() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const assistantStartedRef = useRef(false);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const { conversationId } = useParams();
@@ -61,18 +60,16 @@ function Chat() {
     null,
   );
 
-  function handlePracticeStart(setup: PracticeSetup) {
-    assistantStartedRef.current = setup.starter === "assistant";
-    setPracticeSetup(setup); // inserts values from modal to chat state
-    setShowPracticeSetup(false); // closes the modal
+  async function handlePracticeStart(setup: PracticeSetup) {
+    const activeConversationId = await createConversation(
+      setup.items.map((item) => item.id),
+    );
+
+    setPracticeSetup(setup);
+    setShowPracticeSetup(false);
     setMessages([]);
     setFirstChat(true);
-
-    if (setup.starter === "assistant") {
-      // extract words
-      // call assistant endpoint
-      setFirstChat(false);
-    }
+    navigate(`/app/chat/${activeConversationId}`, { replace: true });
   }
 
   async function getResponse(userMessageId: string): Promise<StoredMessage> {
@@ -113,9 +110,13 @@ function Chat() {
     return result;
   }
 
-  async function createConversation(): Promise<string> {
+  async function createConversation(
+    learningItemIds: string[] = [],
+  ): Promise<string> {
     const response = await apiFetch("/conversations", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ learning_item_ids: learningItemIds }),
     });
 
     if (!response.ok) {
@@ -305,7 +306,7 @@ function Chat() {
     return data.text;
   }
 
-  async function addAsssitantItem(component: BaseComponent) {
+  async function addAssitantItem(component: BaseComponent) {
     const response = await apiFetch("/learning-items", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -384,7 +385,6 @@ function Chat() {
         setFirstChat(true);
         setPracticeSetup(null);
         setShowPracticeSetup(true);
-        assistantStartedRef.current = false;
       }, 0);
 
       return () => window.clearTimeout(resetNewChat);
@@ -443,7 +443,7 @@ function Chat() {
                     : undefined
                 }
                 onAddItem={
-                  message.sender === "assistant" ? addAsssitantItem : undefined
+                  message.sender === "assistant" ? addAssitantItem : undefined
                 }
               />
             ))

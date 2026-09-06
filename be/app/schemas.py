@@ -1,6 +1,6 @@
 from enum import Enum
 from uuid import UUID
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class MessageIdRequest(BaseModel):
@@ -58,6 +58,10 @@ class Role(str, Enum):
 class CreateMessageRequest(BaseModel):
     conversation_id: str
     content: str
+
+
+class CreateConversationRequest(BaseModel):
+    learning_item_ids: list[UUID] = Field(default_factory=list)
 
 
 class CreateLearningItemRequest(BaseComponent):

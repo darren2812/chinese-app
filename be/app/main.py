@@ -16,6 +16,7 @@ from .schemas import (
     SelectionAnalysis,
     VocabSource,
     Role,
+    CreateConversationRequest,
     CreateMessageRequest,
     CreateLearningItemRequest,
 )
@@ -58,10 +59,49 @@ def get_user_message(message_id: UUID, user_id: str) -> dict:
     return result.data
 
 
+def delete_conversation_if_created(
+    conversation_id: str | None,
+    user_id: str,
+) -> None:
+    if conversation_id is not None:
+        (
+            supabase.table("conversations")
+            .delete()
+            .eq("id", conversation_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+
 @app.post("/conversations")
-def create_conversation(claims: dict = Depends(require_user)):
+def create_conversation(
+    request: CreateConversationRequest,
+    claims: dict = Depends(require_user),
+):
     user_id = claims["sub"]
+    conversation_id: str | None = None
+
     try:
+        learning_item_ids = list(
+            dict.fromkeys(str(item_id) for item_id in request.learning_item_ids)
+        )
+
+        if learning_item_ids:
+            learning_items_result = (
+                supabase.table("learning_items")
+                .select("id")
+                .eq("user_id", user_id)
+                .in_("id", learning_item_ids)
+                .execute()
+            )
+            if not isinstance(learning_items_result.data, list) or len(
+                learning_items_result.data
+            ) != len(learning_item_ids):
+                raise HTTPException(
+                    status_code=400,
+                    detail="One or more learning items do not belong to you.",
+                )
+
         insert_result = (
             supabase.table("conversations").insert({"user_id": user_id}).execute()
         )
@@ -78,18 +118,51 @@ def create_conversation(claims: dict = Depends(require_user)):
                 detail="Supabase returned an unexpected conversation format.",
             )
 
-        conversation_id = conversation.get("id")
+        created_conversation_id = conversation.get("id")
+
+        if not isinstance(created_conversation_id, str):
+            raise HTTPException(
+                status_code=500,
+                detail="Created conversation has no valid ID.",
+            )
+
+        conversation_id = created_conversation_id
+
         if not isinstance(conversation_id, str):
             raise HTTPException(
                 status_code=500,
                 detail="Created conversation has no valid ID.",
             )
 
+        if learning_item_ids:
+            practice_items_result = (
+                supabase.table("conversation_practice_items")
+                .insert(
+                    [
+                        {
+                            "conversation_id": conversation_id,
+                            "learning_item_id": learning_item_id,
+                        }
+                        for learning_item_id in learning_item_ids
+                    ]
+                )
+                .execute()
+            )
+            if not isinstance(practice_items_result.data, list) or len(
+                practice_items_result.data
+            ) != len(learning_item_ids):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Practice items were not saved.",
+                )
+
         return {"id": conversation_id}
 
     except HTTPException:
+        delete_conversation_if_created(conversation_id, user_id)
         raise
     except Exception as exc:
+        delete_conversation_if_created(conversation_id, user_id)
         logger.exception("Failed to create conversation for user %s", user_id)
         raise HTTPException(
             status_code=502,
