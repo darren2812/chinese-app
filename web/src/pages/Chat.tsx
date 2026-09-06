@@ -1,5 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import ChatBubble from "../components/ChatBubble";
+import PracticeSetupModal from "../components/PracticeSetupModal";
+import type { PracticeSetup } from "../components/PracticeSetupModal";
 import "./Chat.css";
 import { apiFetch } from "../lib/api";
 import { useParams, useNavigate } from "react-router";
@@ -47,10 +49,31 @@ function Chat() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const assistantStartedRef = useRef(false);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const { conversationId } = useParams();
   const navigate = useNavigate();
+  const [showPracticeSetup, setShowPracticeSetup] = useState(
+    () => !conversationId,
+  );
+  const [practiceSetup, setPracticeSetup] = useState<PracticeSetup | null>(
+    null,
+  );
+
+  function handlePracticeStart(setup: PracticeSetup) {
+    assistantStartedRef.current = setup.starter === "assistant";
+    setPracticeSetup(setup); // inserts values from modal to chat state
+    setShowPracticeSetup(false); // closes the modal
+    setMessages([]);
+    setFirstChat(true);
+
+    if (setup.starter === "assistant") {
+      // extract words
+      // call assistant endpoint
+      setFirstChat(false);
+    }
+  }
 
   async function getResponse(userMessageId: string): Promise<StoredMessage> {
     const response = await apiFetch("/respond", {
@@ -356,9 +379,15 @@ function Chat() {
     */
 
     if (!conversationId) {
-      setMessages([]);
-      setFirstChat(true);
-      return;
+      const resetNewChat = window.setTimeout(() => {
+        setMessages([]);
+        setFirstChat(true);
+        setPracticeSetup(null);
+        setShowPracticeSetup(true);
+        assistantStartedRef.current = false;
+      }, 0);
+
+      return () => window.clearTimeout(resetNewChat);
     }
 
     async function loadConversation() {
@@ -384,8 +413,21 @@ function Chat() {
 
   return (
     <>
+      {showPracticeSetup && (
+        <PracticeSetupModal onStart={handlePracticeStart} />
+      )}
       <main className="chat">
         <section className="chat__messages" aria-live="polite">
+          {practiceSetup && practiceSetup.items.length > 0 && (
+            <aside className="chat__practice-list" aria-label="Practice words">
+              <span>Practicing</span>
+              {practiceSetup.items.map((item) => (
+                <span key={item.id} lang="zh-Hans">
+                  {item.mandarin}
+                </span>
+              ))}
+            </aside>
+          )}
           {firstChat ? (
             <p className="chat__empty">Start speaking…</p>
           ) : (

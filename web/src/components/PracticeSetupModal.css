@@ -1,0 +1,144 @@
+.practice-modal__backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-s);
+  background: rgb(8 6 13 / 46%);
+}
+
+.practice-modal {
+  box-sizing: border-box;
+  display: flex;
+  width: min(100%, 48rem);
+  max-height: min(46rem, calc(100dvh - 2 * var(--space-s)));
+  flex-direction: column;
+  gap: var(--space-s);
+  padding: var(--space-m);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+
+.practice-modal__header h1 {
+  margin: var(--space-s) 0;
+  font-size: var(--step-2);
+}
+
+.practice-modal__header > p,
+.practice-modal__footer > span {
+  color: var(--text);
+  font-size: var(--step--1);
+}
+
+.practice-modal__search {
+  display: grid;
+  gap: var(--space-3xs);
+  color: var(--text-h);
+  font-size: var(--step--1);
+  font-weight: 650;
+  margin-bottom: var(--space-2xs);
+}
+
+.practice-modal__search input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+}
+
+.practice-modal__table-wrap {
+  min-height: 10rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.practice-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.practice-modal__table th,
+.practice-modal__table td {
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.practice-modal__table th {
+  position: sticky;
+  top: 0;
+  background: var(--code-bg);
+  color: var(--text-h);
+  font-size: var(--step--2);
+}
+
+.practice-modal__table td:first-child,
+.practice-modal__table th:first-child {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.practice-modal__table tbody tr:last-child td { border-bottom: 0; }
+.practice-modal__table tbody tr:has(input:checked) { background: var(--accent-bg); }
+.practice-modal__table input { width: 1rem; height: 1rem; accent-color: var(--accent); }
+
+.practice-modal__status { padding: var(--space-m); color: var(--text); }
+.practice-modal__status--error { color: #b42318; }
+
+.practice-modal__starter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-s);
+  padding: 0;
+  border: 0;
+  color: var(--text-h);
+}
+
+.practice-modal__starter legend { margin-bottom: var(--space-3xs); font-weight: 650; }
+.practice-modal__starter label { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.practice-modal__starter input { accent-color: var(--accent); }
+
+.practice-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s);
+}
+
+.practice-modal__start {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .practice-modal { padding: var(--space-s); }
+  .practice-modal__table th:nth-child(3),
+  .practice-modal__table td:nth-child(3) { display: none; }
+}
