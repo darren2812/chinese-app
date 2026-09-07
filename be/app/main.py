@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -86,6 +87,7 @@ def create_conversation(
             dict.fromkeys(str(item_id) for item_id in request.learning_item_ids)
         )
 
+        # This is just a verification step for the learning ids.
         if learning_item_ids:
             learning_items_result = (
                 supabase.table("learning_items")
@@ -167,6 +169,135 @@ def create_conversation(
         raise HTTPException(
             status_code=502,
             detail="Unable to create a conversation right now.",
+        ) from exc
+
+
+@app.post("/conversations/{conversation_id}/start")
+def assistant_start_conversation(
+    conversation_id: UUID, claims: dict = Depends(require_user)
+):
+    user_id = claims["sub"]
+    try:
+        conversation_result = (
+            supabase.table("conversations")
+            .select("id")
+            .eq("id", str(conversation_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not conversation_result.data:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+
+        practice_ids_result = (
+            supabase.table("conversation_practice_items")
+            .select("learning_item_id")
+            .eq("conversation_id", str(conversation_id))
+            .execute()
+        )
+
+        if not isinstance(practice_ids_result.data, list):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected practice-items format.",
+            )
+
+        learning_item_ids = []
+
+        for row in practice_ids_result.data:
+            if not isinstance(row, dict):
+                raise HTTPException(
+                    status_code=500, detail="Row is in an unexpected format."
+                )
+
+            learning_item_id = row.get("learning_item_id")
+            if isinstance(learning_item_id, str):
+                learning_item_ids.append(row["learning_item_id"])
+
+        practice_items_result = (
+            supabase.table("learning_items")
+            .select("mandarin, english, type")
+            .in_("id", learning_item_ids)
+            .execute()
+        )
+
+        if not isinstance(practice_items_result.data, list):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected learning-items format.",
+            )
+
+        practice_data = practice_items_result.data
+
+        practice_context = json.dumps(practice_data, ensure_ascii=False)
+
+        response = client.responses.create(
+            model="gpt-4o-mini",
+            instructions=(
+                "You are a friendly Mandarin conversation partner. "
+                "Start a natural conversation with the learner. "
+                "Create opportunities to use the selected practice items naturally; "
+                "do not mechanically list or quiz them."
+            ),
+            input=f"""
+                Selected practice items:
+                {practice_context}
+
+                Write the first message of the conversation in simplified Mandarin.
+            """,
+        )
+
+        assistant_text = response.output_text
+
+        if not assistant_text.strip():
+            raise HTTPException(
+                status_code=502,
+                detail="The model returned an empty response.",
+            )
+
+        result = (
+            supabase.table("messages")
+            .insert(
+                {
+                    "conversation_id": str(conversation_id),
+                    "user_id": user_id,
+                    "role": Role.ASSISTANT.value,
+                    "content": assistant_text,
+                }
+            )
+            .execute()
+        )
+
+        if not isinstance(result.data, list) or not result.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Assistant message was not returned after saving.",
+            )
+
+        title = " ".join(assistant_text.split())[:100]
+
+        supabase.table("conversations").update({"title": title}).eq(
+            "id", str(conversation_id)
+        ).eq("user_id", user_id).is_("title", "null").execute()
+
+        assistant_message = result.data[0]
+        if not isinstance(assistant_message, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Supabase returned an unexpected response format.",
+            )
+
+        return assistant_message
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Failed to generate first assistant message for user %s", user_id
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to generate assistant message right now.",
         ) from exc
 
 

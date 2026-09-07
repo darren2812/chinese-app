@@ -56,7 +56,7 @@ class Role(str, Enum):
 
 
 class CreateMessageRequest(BaseModel):
-    conversation_id: str
+    conversation_id: UUID
     content: str
 
 

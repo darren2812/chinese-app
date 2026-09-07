@@ -65,9 +65,37 @@ function Chat() {
       setup.items.map((item) => item.id),
     );
 
+    if (setup.starter === "assistant") {
+      const response = await apiFetch(
+        `/conversations/${activeConversationId}/start`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ conversation_id: activeConversationId }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Could not let AI start the conversation")
+      }
+      const assistantMessage : StoredMessage = await response.json();
+      console.log(assistantMessage);
+      setMessages([
+        {
+          id: assistantMessage.id,
+          text: assistantMessage.content,
+          sender: assistantMessage.role,
+        },
+      ]);
+      setFirstChat(false);
+    } else {
+      setMessages([]);
+      setFirstChat(true);
+    }
+
     setPracticeSetup(setup);
     setShowPracticeSetup(false);
-    setMessages([]);
     setFirstChat(true);
     navigate(`/app/chat/${activeConversationId}`, { replace: true });
   }
@@ -403,6 +431,7 @@ function Chat() {
           id: message.id,
           text: message.content,
           sender: message.role,
+          correction: message.correction ?? undefined,
         })),
       );
       setFirstChat(stored.length === 0);
