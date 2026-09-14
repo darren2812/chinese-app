@@ -77,9 +77,9 @@ function Chat() {
         },
       );
       if (!response.ok) {
-        throw new Error("Could not let AI start the conversation")
+        throw new Error("Could not let AI start the conversation");
       }
-      const assistantMessage : StoredMessage = await response.json();
+      const assistantMessage: StoredMessage = await response.json();
       console.log(assistantMessage);
       setMessages([
         {
@@ -100,13 +100,19 @@ function Chat() {
     navigate(`/app/chat/${activeConversationId}`, { replace: true });
   }
 
-  async function getResponse(userMessageId: string): Promise<StoredMessage> {
+  async function getResponse(
+    userMessageId: string,
+    conversationId: string,
+  ): Promise<StoredMessage> {
     const response = await apiFetch("/respond", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message_id: userMessageId }),
+      body: JSON.stringify({
+        message_id: userMessageId,
+        conversation_id: conversationId,
+      }),
     });
 
     if (!response.ok) {
@@ -200,7 +206,7 @@ function Chat() {
       },
     ]);
 
-    const responsePromise = getResponse(userMessageId);
+    const responsePromise = getResponse(userMessageId, activeConversationId);
     const processPromise = processSentence(userMessageId);
 
     const assistantResponse = await responsePromise;
@@ -351,62 +357,7 @@ function Chat() {
     return response.json();
   }
 
-  // const submittedTestPrompt = useRef(false);
-
   useEffect(() => {
-    /*
-    const prompt = import.meta.env.VITE_SUBMIT_TEST_PROMPT?.trim();
-
-    if (!prompt || submittedTestPrompt.current) {
-      return;
-    }
-
-    submittedTestPrompt.current = true;
-
-    async function submitTestPrompt() {
-      try {
-        const activeConversationId =
-          conversationId ?? (await createConversation());
-
-        setConversationId(activeConversationId);
-
-        const userMessageId = await createMessage({
-          conversationId: activeConversationId,
-          content: prompt,
-        });
-
-        setFirstChat(false);
-        setMessages([{ id: userMessageId, text: prompt, sender: "user" }]);
-
-        const responsePromise = getResponse(userMessageId);
-        const processPromise = processSentence(userMessageId);
-
-        const assistantText = await responsePromise;
-
-        setMessages((messages) => [
-          ...messages,
-          {
-            id: crypto.randomUUID(),
-            text: assistantText,
-            sender: "assistant",
-          },
-        ]);
-
-        const correction = await processPromise;
-
-        setMessages((messages) =>
-          messages.map((message) =>
-            message.id === userMessageId ? { ...message, correction } : message,
-          ),
-        );
-      } catch (error) {
-        console.error("Could not submit test prompt", error);
-      }
-    }
-
-    void submitTestPrompt();
-    */
-
     if (!conversationId) {
       const resetNewChat = window.setTimeout(() => {
         setMessages([]);

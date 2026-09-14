@@ -74,6 +74,50 @@ def delete_conversation_if_created(
         )
 
 
+def retrieve_practice_context(conversation_id: UUID):
+    practice_ids_result = (
+        supabase.table("conversation_practice_items")
+        .select("learning_item_id")
+        .eq("conversation_id", str(conversation_id))
+        .execute()
+    )
+
+    if not isinstance(practice_ids_result.data, list):
+        raise HTTPException(
+            status_code=500,
+            detail="Supabase returned an unexpected practice-items format.",
+        )
+
+    learning_item_ids = []
+
+    for row in practice_ids_result.data:
+        if not isinstance(row, dict):
+            raise HTTPException(
+                status_code=500, detail="Row is in an unexpected format."
+            )
+
+        learning_item_id = row.get("learning_item_id")
+        if isinstance(learning_item_id, str):
+            learning_item_ids.append(learning_item_id)
+
+    practice_items_result = (
+        supabase.table("learning_items")
+        .select("mandarin, english, type")
+        .in_("id", learning_item_ids)
+        .execute()
+    )
+
+    if not isinstance(practice_items_result.data, list):
+        raise HTTPException(
+            status_code=500,
+            detail="Supabase returned an unexpected learning-items format.",
+        )
+
+    practice_data = practice_items_result.data
+
+    return practice_data
+
+
 @app.post("/conversations")
 def create_conversation(
     request: CreateConversationRequest,
@@ -189,47 +233,11 @@ def assistant_start_conversation(
         if not conversation_result.data:
             raise HTTPException(status_code=404, detail="Conversation not found.")
 
-        practice_ids_result = (
-            supabase.table("conversation_practice_items")
-            .select("learning_item_id")
-            .eq("conversation_id", str(conversation_id))
-            .execute()
+        practice_context = retrieve_practice_context(conversation_id)
+
+        practice_context_text = json.dumps(
+            practice_context, ensure_ascii=False, separators=(",", ":")
         )
-
-        if not isinstance(practice_ids_result.data, list):
-            raise HTTPException(
-                status_code=500,
-                detail="Supabase returned an unexpected practice-items format.",
-            )
-
-        learning_item_ids = []
-
-        for row in practice_ids_result.data:
-            if not isinstance(row, dict):
-                raise HTTPException(
-                    status_code=500, detail="Row is in an unexpected format."
-                )
-
-            learning_item_id = row.get("learning_item_id")
-            if isinstance(learning_item_id, str):
-                learning_item_ids.append(row["learning_item_id"])
-
-        practice_items_result = (
-            supabase.table("learning_items")
-            .select("mandarin, english, type")
-            .in_("id", learning_item_ids)
-            .execute()
-        )
-
-        if not isinstance(practice_items_result.data, list):
-            raise HTTPException(
-                status_code=500,
-                detail="Supabase returned an unexpected learning-items format.",
-            )
-
-        practice_data = practice_items_result.data
-
-        practice_context = json.dumps(practice_data, ensure_ascii=False)
 
         response = client.responses.create(
             model="gpt-4o-mini",
@@ -238,13 +246,16 @@ def assistant_start_conversation(
                 "Start a natural conversation with the learner. "
                 "Create opportunities to use the selected practice items naturally; "
                 "do not mechanically list or quiz them."
+                "Write the first message of the conversation in simplified Mandarin."
             ),
-            input=f"""
-                Selected practice items:
-                {practice_context}
-
-                Write the first message of the conversation in simplified Mandarin.
-            """,
+            input=[
+                {
+                    "role": "developer",
+                    "content": (
+                        "Practice context, as JSON:\n" f"{practice_context_text}"
+                    ),
+                }
+            ],
         )
 
         assistant_text = response.output_text
@@ -503,15 +514,43 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
     try:
         message = get_user_message(request.message_id, user_id)
+        previous_messages_data = get_conversation_messages(request.conversation_id)
+
+        history = []
+
+        for message_data in previous_messages_data:
+            if not isinstance(message_data, dict):
+                raise HTTPException(
+                    status_code=500, detail="Message data is in an unexpected format."
+                )
+            role = message_data["role"]
+            content = message_data["content"]
+
+            history.append({"role": role, "content": content})
+
+        practice_context = retrieve_practice_context(request.conversation_id)
+        practice_context_text = json.dumps(
+            practice_context, ensure_ascii=False, separators=(",", ":")
+        )
+
+        input_messages = [
+            {
+                "role": "developer",
+                "content": ("Practice context, as JSON:\n" f"{practice_context_text}"),
+            },
+            *history,
+        ]
 
         response = client.responses.create(
             model="gpt-4o-mini",
             instructions=(
-                "You are a Mandarin conversation partner. "
+                "You are a friendly Mandarin conversation partner. "
                 "The learner may mix English words into Chinese sentences. "
                 "Understand the intended meaning and continue the conversation naturally in simplified Mandarin. "
+                "Create opportunities to use the selected practice items naturally; "
+                "do not mechanically list or quiz them."
             ),
-            input=message["content"],
+            input=input_messages,
         )
 
         assistant_text = response.output_text

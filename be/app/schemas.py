@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class MessageIdRequest(BaseModel):
     message_id: UUID
+    conversation_id: UUID
 
 
 class ProcessedSentence(BaseModel):
