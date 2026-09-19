@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+from typing import Any, cast
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -369,13 +370,9 @@ def get_conversations(claims: dict = Depends(require_user)):
         ) from exc
 
 
-@app.get("/conversations/{conversation_id}/messages")
-def get_conversation_messages(
-    conversation_id: UUID,
-    claims: dict = Depends(require_user),
-):
-    user_id = claims["sub"]
-
+def fetch_conversation_messages(
+    conversation_id: UUID, user_id: str
+) -> list[dict[str, Any]]:
     try:
         conversation_result = (
             supabase.table("conversations")
@@ -406,7 +403,7 @@ def get_conversation_messages(
                 detail="Supabase returned an unexpected messages format.",
             )
 
-        return result.data
+        return cast(list[dict[str, Any]], result.data)
 
     except HTTPException:
         raise
@@ -420,6 +417,14 @@ def get_conversation_messages(
             status_code=502,
             detail="Unable to fetch conversation messages right now.",
         ) from exc
+
+
+@app.get("/conversations/{conversation_id}/messages")
+def get_conversation_messages(
+    conversation_id: UUID,
+    claims: dict = Depends(require_user),
+):
+    return fetch_conversation_messages(conversation_id, claims["sub"])
 
 
 @app.delete("/conversations/{conversation_id}")
@@ -540,7 +545,9 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
     try:
         message = get_user_message(request.message_id, user_id)
-        previous_messages_data = get_conversation_messages(request.conversation_id, claims)
+        previous_messages_data = fetch_conversation_messages(
+            request.conversation_id, user_id
+        )
 
         history = []
 
