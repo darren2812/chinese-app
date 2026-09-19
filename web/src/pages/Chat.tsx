@@ -45,10 +45,19 @@ type CreateMessageInput = {
   content: string;
 };
 
+type ActiveAudio = {
+  audio: HTMLAudioElement;
+  controller: AbortController;
+  mediaSource: MediaSource;
+  objectUrl: string;
+};
+
 function Chat() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const activeAudioRef = useRef<ActiveAudio | null>(null);
+  const [needsAudioGesture, setNeedsAudioGesture] = useState(false);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const { conversationId } = useParams();
@@ -220,7 +229,9 @@ function Chat() {
       },
     ]);
 
-    void streamMessageAudio(assistantResponse.id);
+    void streamMessageAudio(assistantResponse.id).catch((error: unknown) => {
+      console.error("TTS stream failed:", error);
+    });
 
     // 4. Process was already running in parallel
     const processResult = await processPromise;
@@ -365,8 +376,38 @@ function Chat() {
     );
   }
 
+  function discardActiveAudio() {
+    const activeAudio = activeAudioRef.current;
+    if (!activeAudio) return;
+
+    activeAudioRef.current = null;
+    activeAudio.controller.abort();
+    activeAudio.audio.pause();
+    activeAudio.audio.removeAttribute("src");
+    activeAudio.audio.load();
+    URL.revokeObjectURL(activeAudio.objectUrl);
+  }
+
+  async function playActiveAudio() {
+    const activeAudio = activeAudioRef.current;
+    if (!activeAudio) return;
+
+    try {
+      await activeAudio.audio.play();
+      setNeedsAudioGesture(false);
+    } catch (error) {
+      console.error("Could not play reply audio:", error);
+    }
+  }
+
   async function streamMessageAudio(messageId: string) {
-    const response = await apiFetch(`/messages/${messageId}/audio`);
+    discardActiveAudio();
+    setNeedsAudioGesture(false);
+
+    const controller = new AbortController();
+    const response = await apiFetch(`/messages/${messageId}/audio`, {
+      signal: controller.signal,
+    });
 
     if (!response.ok || !response.body) {
       throw new Error("Could not generate speech");
@@ -381,6 +422,22 @@ function Chat() {
     const mediaSource = new MediaSource();
     const objectUrl = URL.createObjectURL(mediaSource);
     const audio = new Audio(objectUrl);
+    const activeAudio = { audio, controller, mediaSource, objectUrl };
+    activeAudioRef.current = activeAudio;
+
+    const releaseAudio = () => {
+      if (activeAudioRef.current === activeAudio) {
+        activeAudioRef.current = null;
+        setNeedsAudioGesture(false);
+      }
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    audio.onended = releaseAudio;
+    audio.onerror = () => {
+      console.error("Reply audio could not be decoded or played.", audio.error);
+      releaseAudio();
+    };
 
     await waitForEvent(mediaSource, "sourceopen");
 
@@ -393,19 +450,37 @@ function Chat() {
         const { done, value } = await reader.read();
         if (done) break;
 
+        if (controller.signal.aborted) return;
+
         sourceBuffer.appendBuffer(value);
-        await waitForEvent(sourceBuffer, "updateend")
+        await waitForEvent(sourceBuffer, "updateend");
 
         if (!playbackStarted) {
           playbackStarted = true;
-          await audio.play();
+          try {
+            await audio.play();
+          } catch (error) {
+            if (
+              error instanceof DOMException &&
+              (error.name === "NotAllowedError" || error.name === "AbortError")
+            ) {
+              // The recording click happened before the API requests completed,
+              // so it no longer counts as a user gesture for autoplay. Some
+              // browsers report that abandoned initial play attempt as AbortError.
+              setNeedsAudioGesture(true);
+            } else {
+              throw error;
+            }
+          }
         }
       }
 
-      if (mediaSource.readyState === "open") {
+      if (!controller.signal.aborted && mediaSource.readyState === "open") {
         mediaSource.endOfStream();
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
+
       if (mediaSource.readyState === "open") {
         mediaSource.endOfStream("network");
       }
@@ -414,11 +489,10 @@ function Chat() {
       reader.releaseLock();
     }
 
-    audio.onended = () => URL.revokeObjectURL(objectUrl);
-    audio.onerror = () => URL.revokeObjectURL(objectUrl);
-    
     return audio;
   }
+
+  useEffect(() => discardActiveAudio, []);
 
   useEffect(() => {
     if (!conversationId) {
@@ -494,6 +568,15 @@ function Chat() {
         </section>
 
         <footer className="chat__composer">
+          {needsAudioGesture && (
+            <button
+              type="button"
+              className="play-audio-btn"
+              onClick={() => void playActiveAudio()}
+            >
+              Play reply
+            </button>
+          )}
           <button
             type="button"
             className="recording-btn"

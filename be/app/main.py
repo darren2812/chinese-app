@@ -41,7 +41,7 @@ app.add_middleware(
 )
 
 
-def get_user_message(message_id: UUID, user_id: str) -> dict:
+def get_message(message_id: UUID, user_id: str, expected_role: Role | None = None) -> dict:
     result = (
         supabase.table("messages")
         .select("id, conversation_id, user_id, role, content")
@@ -54,10 +54,10 @@ def get_user_message(message_id: UUID, user_id: str) -> dict:
     if not isinstance(result.data, dict):
         raise HTTPException(status_code=404, detail="Message not found")
 
-    if result.data["role"] != "user":
+    if expected_role is not None and result.data["role"] != expected_role.value:
         raise HTTPException(
             status_code=400,
-            detail="Responses can only be generated from user messages.",
+            detail="Trying to retrieve messages of the wrong role.",
         )
 
     return result.data
@@ -127,7 +127,7 @@ def generate_message_audio(
     claims: dict = Depends(require_user),
 ):
     user_id = claims["sub"]
-    message = get_user_message(message_id, user_id)
+    message = get_message(message_id, user_id, Role.ASSISTANT)
 
     def audio_chunks():
         with client.audio.speech.with_streaming_response.create(
@@ -544,7 +544,7 @@ def create_message(request: CreateMessageRequest, claims: dict = Depends(require
 def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
     try:
-        message = get_user_message(request.message_id, user_id)
+        message = get_message(request.message_id, user_id, Role.USER)
         previous_messages_data = fetch_conversation_messages(
             request.conversation_id, user_id
         )
@@ -636,7 +636,7 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
 def process(request: ProcessMessageRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
     try:
-        message = get_user_message(request.message_id, user_id)
+        message = get_message(request.message_id, user_id, Role.USER)
 
         response = client.responses.parse(
             model="gpt-4o-mini",

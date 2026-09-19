@@ -56,6 +56,8 @@
   position: sticky;
   bottom: 0;
   display: flex;
+  align-items: center;
+  gap: var(--space-xs);
   justify-content: center;
   padding: var(--space-s) var(--space-s)
     max(var(--space-m), env(safe-area-inset-bottom));
@@ -67,5 +69,15 @@
   padding: 0 20px;
   border-radius: 999px;
   background: var(--accent-bg);
+  cursor: pointer;
+}
+
+.play-audio-btn {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-h);
   cursor: pointer;
 }
