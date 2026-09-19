@@ -220,6 +220,8 @@ function Chat() {
       },
     ]);
 
+    void streamMessageAudio(assistantResponse.id);
+
     // 4. Process was already running in parallel
     const processResult = await processPromise;
 
@@ -355,6 +357,67 @@ function Chat() {
     }
 
     return response.json();
+  }
+
+  function waitForEvent(target: EventTarget, event: string) {
+    return new Promise<void>((resolve) =>
+      target.addEventListener(event, () => resolve(), { once: true }),
+    );
+  }
+
+  async function streamMessageAudio(messageId: string) {
+    const response = await apiFetch(`/messages/${messageId}/audio`);
+
+    if (!response.ok || !response.body) {
+      throw new Error("Could not generate speech");
+    }
+
+    const mimeType = "audio/mpeg";
+
+    if (!MediaSource.isTypeSupported(mimeType)) {
+      throw new Error("This browser cannot progressively play MP3 audio");
+    }
+
+    const mediaSource = new MediaSource();
+    const objectUrl = URL.createObjectURL(mediaSource);
+    const audio = new Audio(objectUrl);
+
+    await waitForEvent(mediaSource, "sourceopen");
+
+    const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+    const reader = response.body.getReader();
+    let playbackStarted = false;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        sourceBuffer.appendBuffer(value);
+        await waitForEvent(sourceBuffer, "updateend")
+
+        if (!playbackStarted) {
+          playbackStarted = true;
+          await audio.play();
+        }
+      }
+
+      if (mediaSource.readyState === "open") {
+        mediaSource.endOfStream();
+      }
+    } catch (error) {
+      if (mediaSource.readyState === "open") {
+        mediaSource.endOfStream("network");
+      }
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
+
+    audio.onended = () => URL.revokeObjectURL(objectUrl);
+    audio.onerror = () => URL.revokeObjectURL(objectUrl);
+    
+    return audio;
   }
 
   useEffect(() => {

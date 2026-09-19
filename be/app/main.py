@@ -4,6 +4,7 @@ import json
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from openai import OpenAI
 from uuid import UUID
@@ -12,6 +13,7 @@ load_dotenv()
 
 from .schemas import (
     MessageIdRequest,
+    ProcessMessageRequest,
     HoverRequest,
     ProcessedSentence,
     SelectionAnalysis,
@@ -116,6 +118,30 @@ def retrieve_practice_context(conversation_id: UUID):
     practice_data = practice_items_result.data
 
     return practice_data
+
+
+@app.get("/messages/{message_id}/audio")
+def generate_message_audio(
+    message_id: UUID,
+    claims: dict = Depends(require_user),
+):
+    user_id = claims["sub"]
+    message = get_user_message(message_id, user_id)
+
+    def audio_chunks():
+        with client.audio.speech.with_streaming_response.create(
+            model="gpt-4o-mini-tts",
+            voice="marin",
+            input=message["content"],
+            response_format="mp3",
+        ) as tts_response:
+            yield from tts_response.iter_bytes()
+
+    return StreamingResponse(
+        audio_chunks(),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.post("/conversations")
@@ -514,7 +540,7 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
     try:
         message = get_user_message(request.message_id, user_id)
-        previous_messages_data = get_conversation_messages(request.conversation_id)
+        previous_messages_data = get_conversation_messages(request.conversation_id, claims)
 
         history = []
 
@@ -600,7 +626,7 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
 
 
 @app.post("/process")
-def process(request: MessageIdRequest, claims: dict = Depends(require_user)):
+def process(request: ProcessMessageRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
     try:
         message = get_user_message(request.message_id, user_id)
