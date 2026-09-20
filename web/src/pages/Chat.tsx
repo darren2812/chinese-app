@@ -97,6 +97,9 @@ function Chat() {
           sender: assistantMessage.role,
         },
       ]);
+      void streamMessageAudio(assistantMessage.id).catch((error: unknown) => {
+        console.error("TTS stream failed:", error);
+      });
       setFirstChat(false);
     } else {
       setMessages([]);
@@ -457,9 +460,7 @@ function Chat() {
 
         if (!playbackStarted) {
           playbackStarted = true;
-          try {
-            await audio.play();
-          } catch (error) {
+          void audio.play().catch((error) => {
             if (
               error instanceof DOMException &&
               (error.name === "NotAllowedError" || error.name === "AbortError")
@@ -471,7 +472,7 @@ function Chat() {
             } else {
               throw error;
             }
-          }
+          });
         }
       }
 
