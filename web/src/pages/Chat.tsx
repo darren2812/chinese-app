@@ -47,8 +47,7 @@ type CreateMessageInput = {
 
 type ActiveAudio = {
   audio: HTMLAudioElement;
-  controller: AbortController;
-  mediaSource: MediaSource;
+  controller?: AbortController;
   objectUrl: string;
 };
 
@@ -57,7 +56,7 @@ function Chat() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const activeAudioRef = useRef<ActiveAudio | null>(null);
-  const [needsAudioGesture, setNeedsAudioGesture] = useState(false);
+  const audioCacheRef = useRef(new Map<string, Blob>());
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const { conversationId } = useParams();
@@ -68,6 +67,9 @@ function Chat() {
   const [practiceSetup, setPracticeSetup] = useState<PracticeSetup | null>(
     null,
   );
+  const [streamingAudioMessageIds, setStreamingAudioMessageIds] = useState<
+    Set<string>
+  >(() => new Set());
 
   async function handlePracticeStart(setup: PracticeSetup) {
     const activeConversationId = await createConversation(
@@ -384,28 +386,62 @@ function Chat() {
     if (!activeAudio) return;
 
     activeAudioRef.current = null;
-    activeAudio.controller.abort();
+    activeAudio.controller?.abort();
     activeAudio.audio.pause();
     activeAudio.audio.removeAttribute("src");
     activeAudio.audio.load();
     URL.revokeObjectURL(activeAudio.objectUrl);
   }
 
-  async function playActiveAudio() {
-    const activeAudio = activeAudioRef.current;
-    if (!activeAudio) return;
+  async function playMessageAudio(messageId: string) {
+    discardActiveAudio();
+    const blob = audioCacheRef.current.get(messageId);
 
-    try {
-      await activeAudio.audio.play();
-      setNeedsAudioGesture(false);
-    } catch (error) {
-      console.error("Could not play reply audio:", error);
+    if (blob) {
+      const objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
+      const activeAudio = { audio, objectUrl };
+      activeAudioRef.current = activeAudio;
+
+      const releaseAudio = () => {
+        if (activeAudioRef.current === activeAudio) {
+          activeAudioRef.current = null;
+        }
+        URL.revokeObjectURL(objectUrl);
+      };
+
+      audio.onended = releaseAudio;
+      audio.onerror = () => {
+        console.error(
+          "Reply audio could not be decoded or played.",
+          audio.error,
+        );
+        releaseAudio();
+      };
+
+      await audio.play();
+    } else {
+      await streamMessageAudio(messageId);
     }
+  }
+
+  function setAudioStreaming(messageId: string, isStreaming: boolean) {
+    setStreamingAudioMessageIds((ids) => {
+      const nextIds = new Set(ids);
+
+      if (isStreaming) {
+        nextIds.add(messageId);
+      } else {
+        nextIds.delete(messageId);
+      }
+
+      return nextIds;
+    });
   }
 
   async function streamMessageAudio(messageId: string) {
     discardActiveAudio();
-    setNeedsAudioGesture(false);
+    setAudioStreaming(messageId, true);
 
     const controller = new AbortController();
     const response = await apiFetch(`/messages/${messageId}/audio`, {
@@ -431,7 +467,6 @@ function Chat() {
     const releaseAudio = () => {
       if (activeAudioRef.current === activeAudio) {
         activeAudioRef.current = null;
-        setNeedsAudioGesture(false);
       }
       URL.revokeObjectURL(objectUrl);
     };
@@ -448,6 +483,8 @@ function Chat() {
     const reader = response.body.getReader();
     let playbackStarted = false;
 
+    const chunks: ArrayBuffer[] = [];
+
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -455,23 +492,20 @@ function Chat() {
 
         if (controller.signal.aborted) return;
 
-        sourceBuffer.appendBuffer(value);
+        if (value) {
+          const copy = new Uint8Array(value.byteLength);
+          copy.set(value);
+
+          chunks.push(copy.buffer);
+          sourceBuffer.appendBuffer(value);
+        }
+
         await waitForEvent(sourceBuffer, "updateend");
 
         if (!playbackStarted) {
           playbackStarted = true;
           void audio.play().catch((error) => {
-            if (
-              error instanceof DOMException &&
-              (error.name === "NotAllowedError" || error.name === "AbortError")
-            ) {
-              // The recording click happened before the API requests completed,
-              // so it no longer counts as a user gesture for autoplay. Some
-              // browsers report that abandoned initial play attempt as AbortError.
-              setNeedsAudioGesture(true);
-            } else {
-              throw error;
-            }
+            console.log(error);
           });
         }
       }
@@ -479,6 +513,11 @@ function Chat() {
       if (!controller.signal.aborted && mediaSource.readyState === "open") {
         mediaSource.endOfStream();
       }
+
+      audioCacheRef.current.set(
+        messageId,
+        new Blob(chunks, { type: "audio/mpeg" }),
+      );
     } catch (error) {
       if (controller.signal.aborted) return;
 
@@ -488,6 +527,7 @@ function Chat() {
       throw error;
     } finally {
       reader.releaseLock();
+      setAudioStreaming(messageId, false);
     }
 
     return audio;
@@ -552,6 +592,7 @@ function Chat() {
             messages.map((message) => (
               <ChatBubble
                 key={message.id}
+                messageId={message.id}
                 text={message.text}
                 sender={message.sender}
                 correction={message.correction}
@@ -563,21 +604,16 @@ function Chat() {
                 onAddItem={
                   message.sender === "assistant" ? addAssitantItem : undefined
                 }
+                isAudioStreaming={streamingAudioMessageIds.has(message.id)}
+                onPlayAudio={
+                  message.sender === "assistant" ? playMessageAudio : undefined
+                }
               />
             ))
           )}
         </section>
 
         <footer className="chat__composer">
-          {needsAudioGesture && (
-            <button
-              type="button"
-              className="play-audio-btn"
-              onClick={() => void playActiveAudio()}
-            >
-              Play reply
-            </button>
-          )}
           <button
             type="button"
             className="recording-btn"

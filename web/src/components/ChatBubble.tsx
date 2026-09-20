@@ -7,6 +7,7 @@ import type {
 } from "../pages/Chat";
 
 type ChatBubbleProps = {
+  messageId: string;
   text: string;
   sender: "user" | "assistant";
   correction?: ProcessResult;
@@ -16,14 +17,19 @@ type ChatBubbleProps = {
     sentence: string,
   ) => Promise<SelectionAnalysis>;
   onAddItem?: (component: BaseComponent) => Promise<void>;
+  isAudioStreaming?: boolean;
+  onPlayAudio?: (id: string) => Promise<void>;
 };
 
 export default function ChatBubble({
+  messageId,
   text,
   sender,
   correction,
   onSelection,
   onAddItem,
+  isAudioStreaming,
+  onPlayAudio,
 }: ChatBubbleProps) {
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
   const [selectionAnalysis, setSelectionAnalysis] =
@@ -49,7 +55,7 @@ export default function ChatBubble({
     <article className={`message message--${sender}`}>
       <div
         className={`chat-bubble chat-bubble--${sender}`}
-        onMouseUp={sender === "assistant" ? handleMouseUp : undefined}
+        onMouseUp={onSelection ? handleMouseUp : undefined}
       >
         {text}
       </div>
@@ -106,7 +112,7 @@ export default function ChatBubble({
         </>
       )}
 
-      {sender === "assistant" && selectionAnalysis && (
+      {onAddItem && selectionAnalysis && (
         <>
           <div className="correction-card__section">
             {selectionAnalysis.components.map((component) => (
@@ -128,6 +134,18 @@ export default function ChatBubble({
             ))}
             <p>{selectionAnalysis.explanation}</p>
           </div>
+        </>
+      )}
+
+      {onPlayAudio && (
+        <>
+          <button
+            className="play-audio-btn"
+            onClick={() => void onPlayAudio?.(messageId)}
+            disabled={isAudioStreaming}
+          >
+            Play audio
+          </button>
         </>
       )}
     </article>

@@ -111,3 +111,14 @@
 .correction-card__section + .correction-card__section {
   margin-top: var(--space-s);
 }
+
+.play-audio-btn {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+}
+
