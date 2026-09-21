@@ -1,4 +1,9 @@
-import { useRef, useState, useEffect, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useRef,
+  useState,
+  useEffect,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import ChatBubble from "../components/ChatBubble";
 import PracticeSetupModal from "../components/PracticeSetupModal";
 import type { PracticeSetup } from "../components/PracticeSetupModal";
@@ -56,6 +61,7 @@ function Chat() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const activeAudioRef = useRef<ActiveAudio | null>(null);
+  const activeTextStreamRef = useRef<AbortController | null>(null);
   const audioCacheRef = useRef(new Map<string, Blob>());
   const recordingStoppedAtRef = useRef<number | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
@@ -139,6 +145,82 @@ function Chat() {
     return data;
   }
 
+  type TextStreamEvent =
+    | { type: "delta"; text: string }
+    | { type: "done"; message: StoredMessage }
+    | { type: "error"; message: string };
+
+  async function getStreamedResponse(
+    userMessageId: string,
+    conversationId: string,
+    onDelta: (text: string) => void,
+  ): Promise<StoredMessage> {
+    const response = await apiFetch("/respond", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message_id: userMessageId,
+        conversation_id: conversationId,
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error("Could not start response stream.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullText = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let boundaryIndex: number;
+
+        // checks if the double line break still exists
+        while ((boundaryIndex = buffer.indexOf("\n\n")) !== -1) {
+          // takes the line leading to the double line break
+          const eventBlock = buffer.slice(0, boundaryIndex);
+          // deletes the two \n characters
+          buffer = buffer.slice(boundaryIndex + 2);
+          // takes a data json file by filtering events that start with data:
+          // and then getting rid of the "data: "
+          const data = eventBlock
+            .split("\n")
+            .filter((line) => line.startsWith("data"))
+            .map((line) => line.slice(6))
+            .join("\n");
+
+          if (!data) continue;
+
+          const event = JSON.parse(data) as TextStreamEvent;
+
+          if (event.type === "delta") {
+            fullText += event.text;
+            onDelta(event.text);
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.message);
+          }
+
+          if (event.type === "done") {
+            return event.message;
+          }
+        }
+      }
+      throw new Error("Response stream ended before a done event.");
+    } finally {
+      reader.releaseLock();
+    }
+  }
   function logTimingCheckpoint(
     checkpoint: string,
     messageId: string,
@@ -513,7 +595,10 @@ function Chat() {
         { once: true },
       );
       audio.onerror = () => {
-        console.error("Reply audio could not be decoded or played.", audio.error);
+        console.error(
+          "Reply audio could not be decoded or played.",
+          audio.error,
+        );
         releaseAudio();
       };
 
@@ -623,7 +708,7 @@ function Chat() {
   }
 
   useEffect(() => discardActiveAudio, []);
-
+  useEffect(() => () => activeTextStreamRef.current?.abort(), []);
   useEffect(() => {
     if (!conversationId) {
       const resetNewChat = window.setTimeout(() => {
