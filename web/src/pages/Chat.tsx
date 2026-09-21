@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, type MouseEvent as ReactMouseEvent } from "react";
 import ChatBubble from "../components/ChatBubble";
 import PracticeSetupModal from "../components/PracticeSetupModal";
 import type { PracticeSetup } from "../components/PracticeSetupModal";
@@ -57,6 +57,7 @@ function Chat() {
   const audioChunksRef = useRef<Blob[]>([]);
   const activeAudioRef = useRef<ActiveAudio | null>(null);
   const audioCacheRef = useRef(new Map<string, Blob>());
+  const recordingStoppedAtRef = useRef<number | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const { conversationId } = useParams();
@@ -133,8 +134,31 @@ function Chat() {
       throw new Error("Could not generate response");
     }
 
-    const data = await response.json();
+    const data: StoredMessage = await response.json();
+    logTimingCheckpoint("Full message received", data.id);
     return data;
+  }
+
+  function logTimingCheckpoint(
+    checkpoint: string,
+    messageId: string,
+    complete = false,
+  ) {
+    const recordingStoppedAt = recordingStoppedAtRef.current;
+
+    if (recordingStoppedAt === null) return;
+
+    const elapsedMs = performance.now() - recordingStoppedAt;
+    console.log(`[Recording stop → audio] ${checkpoint}`, {
+      messageId,
+      elapsedMs: Number(elapsedMs.toFixed(1)),
+    });
+
+    if (complete) recordingStoppedAtRef.current = null;
+  }
+
+  function logAudioPlaybackStarted(messageId: string) {
+    logTimingCheckpoint("Audio playback started", messageId, true);
   }
 
   async function processSentence(
@@ -234,9 +258,11 @@ function Chat() {
       },
     ]);
 
-    void streamMessageAudio(assistantResponse.id).catch((error: unknown) => {
-      console.error("TTS stream failed:", error);
-    });
+    void fetchAndPlayFullMessageAudio(assistantResponse.id).catch(
+      (error: unknown) => {
+        console.error("TTS playback failed:", error);
+      },
+    );
 
     // 4. Process was already running in parallel
     const processResult = await processPromise;
@@ -256,9 +282,13 @@ function Chat() {
     }
   }
 
-  async function handleOnRecordingClick() {
+  async function handleOnRecordingClick(
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
     if (recording) {
       // access the current reference of the media recorder and stop it
+      recordingStoppedAtRef.current = event.timeStamp;
+      console.log("[Recording stop → audio] Recording stopped");
       mediaRecorderRef.current?.stop();
       setRecording(false);
       setFirstChat(false);
@@ -411,6 +441,11 @@ function Chat() {
       };
 
       audio.onended = releaseAudio;
+      audio.addEventListener(
+        "playing",
+        () => logAudioPlaybackStarted(messageId),
+        { once: true },
+      );
       audio.onerror = () => {
         console.error(
           "Reply audio could not be decoded or played.",
@@ -437,6 +472,55 @@ function Chat() {
 
       return nextIds;
     });
+  }
+
+  async function fetchAndPlayFullMessageAudio(messageId: string) {
+    discardActiveAudio();
+    setAudioStreaming(messageId, true);
+
+    const controller = new AbortController();
+
+    try {
+      const response = await apiFetch(`/messages/${messageId}/audio`, {
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not generate speech");
+      }
+
+      // Calling blob() buffers the entire response before any playback begins.
+      const blob = await response.blob();
+      logTimingCheckpoint("Full audio received", messageId);
+      audioCacheRef.current.set(messageId, blob);
+
+      const objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
+      const activeAudio = { audio, controller, objectUrl };
+      activeAudioRef.current = activeAudio;
+
+      const releaseAudio = () => {
+        if (activeAudioRef.current === activeAudio) {
+          activeAudioRef.current = null;
+        }
+        URL.revokeObjectURL(objectUrl);
+      };
+
+      audio.onended = releaseAudio;
+      audio.addEventListener(
+        "playing",
+        () => logAudioPlaybackStarted(messageId),
+        { once: true },
+      );
+      audio.onerror = () => {
+        console.error("Reply audio could not be decoded or played.", audio.error);
+        releaseAudio();
+      };
+
+      await audio.play();
+    } finally {
+      setAudioStreaming(messageId, false);
+    }
   }
 
   async function streamMessageAudio(messageId: string) {
@@ -472,6 +556,11 @@ function Chat() {
     };
 
     audio.onended = releaseAudio;
+    audio.addEventListener(
+      "playing",
+      () => logAudioPlaybackStarted(messageId),
+      { once: true },
+    );
     audio.onerror = () => {
       console.error("Reply audio could not be decoded or played.", audio.error);
       releaseAudio();
