@@ -1,4 +1,5 @@
 .vocabulary-card {
+  position: relative;
   flex: 1 1 15rem;
   min-width: min(100%, 13rem);
   height: clamp(11rem, 21vw, 14rem);
@@ -115,6 +116,52 @@
   outline-offset: 2px;
 }
 
+.vocabulary-card__actions {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: flex;
+  gap: 0.35rem;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.vocabulary-card:hover .vocabulary-card__actions,
+.vocabulary-card:focus-within .vocabulary-card__actions {
+  opacity: 1;
+}
+
+.vocabulary-card__action {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: var(--step-1);
+  cursor: pointer;
+}
+
+.vocabulary-card__action:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.vocabulary-card__action:focus-visible {
+  outline: 3px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.vocabulary-card__action--delete:hover {
+  border-color: var(--error, #c94c4c);
+  color: var(--error, #c94c4c);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vocabulary-card__inner {
     transition: none;
@@ -124,5 +171,9 @@
 @media (max-width: 640px) {
   .vocabulary-card {
     flex-basis: 100%;
+  }
+
+  .vocabulary-card__actions {
+    opacity: 1;
   }
 }

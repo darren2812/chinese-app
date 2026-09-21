@@ -54,10 +54,7 @@ export default function LearningItems() {
   );
   const userItems = learningItems.filter((item) => item.source !== "detected");
 
-  function toggleId(
-    id: string,
-    setter: Dispatch<SetStateAction<Set<string>>>,
-  ) {
+  function toggleId(id: string, setter: Dispatch<SetStateAction<Set<string>>>) {
     setter((currentIds) => {
       const nextIds = new Set(currentIds);
       if (nextIds.has(id)) nextIds.delete(id);
@@ -71,6 +68,42 @@ export default function LearningItems() {
     setFlippedIds(new Set());
   }
 
+  async function handleDeleteLearningItem(itemId: string) {
+    const response = await apiFetch(`/learning-items/${itemId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Could not delete learning item.");
+    }
+    setLearningItems((items) => items.filter((item) => item.id != itemId));
+    setFlippedIds((ids) => {
+      const next = new Set(ids);
+      next.delete(itemId);
+      return next;
+    });
+    setPinyinIds((ids) => {
+      const next = new Set(ids);
+      next.delete(itemId);
+      return next;
+    });
+  }
+
+  async function handleAddToList(itemId: string) {
+    const response = await apiFetch(`/learning-items/${itemId}`, {
+      method: "PATCH",
+    })
+    if (!response.ok) {
+      throw new Error("Could not add learning item to list.");
+    }
+    setLearningItems((items) => items.map((item) => {
+      if (item.id === itemId) {
+        return { ...item, source: "user" }
+      } else {
+        return item;
+      }
+    }));
+  }
+
   return (
     <main className="learning-items-page">
       <header className="learning-items-page__header">
@@ -79,7 +112,10 @@ export default function LearningItems() {
         </div>
 
         <div className="language-control">
-          <span className="language-control__label" id="starting-language-label">
+          <span
+            className="language-control__label"
+            id="starting-language-label"
+          >
             Start with English or Mandarin
           </span>
           <label className="language-switch">
@@ -120,6 +156,8 @@ export default function LearningItems() {
             startingLanguage={startingLanguage}
             onFlip={(id) => toggleId(id, setFlippedIds)}
             onTogglePinyin={(id) => toggleId(id, setPinyinIds)}
+            onDelete={(id) => handleDeleteLearningItem(id)}
+            onAddToList={(id) => handleAddToList(id)}
           />
 
           <LearningItemSection
@@ -131,6 +169,7 @@ export default function LearningItems() {
             startingLanguage={startingLanguage}
             onFlip={(id) => toggleId(id, setFlippedIds)}
             onTogglePinyin={(id) => toggleId(id, setPinyinIds)}
+            onDelete={(id) => handleDeleteLearningItem(id)}
           />
         </div>
       )}

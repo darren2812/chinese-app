@@ -848,6 +848,30 @@ def delete_learning_item(item_id: UUID, claims: dict = Depends(require_user)):
             detail="Unable to delete the learning item right now.",
         ) from exc
 
+@app.patch("/learning-items/{item_id}")
+def update_learning_item_source(item_id: UUID, claims: dict = Depends(require_user)):
+    
+    user_id = claims["sub"]
+    
+    try: 
+        result = (
+            supabase.table("learning-items")
+            .update(
+                {
+                    "source": VocabSource.MANUAL_USER.value,
+                }
+            )
+            .eq("id", str(item_id))
+            .execute
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not update vocabulary item right now."
+        )
+        
 
 @app.post("/transcribe")
 def transcribe(file: UploadFile = File(...), claims: dict = Depends(require_user)):

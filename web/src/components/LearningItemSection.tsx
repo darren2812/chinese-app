@@ -11,6 +11,8 @@ type LearningItemSectionProps = {
   startingLanguage: StartingLanguage;
   onFlip: (id: string) => void;
   onTogglePinyin: (id: string) => void;
+  onDelete: (id: string) => void;
+  onAddToList?: (id: string) => void;
 };
 
 export default function LearningItemSection({
@@ -22,6 +24,8 @@ export default function LearningItemSection({
   startingLanguage,
   onFlip,
   onTogglePinyin,
+  onDelete,
+  onAddToList,
 }: LearningItemSectionProps) {
   return (
     <section className="vocabulary-section">
@@ -38,6 +42,8 @@ export default function LearningItemSection({
               startingLanguage={startingLanguage}
               onFlip={() => onFlip(item.id)}
               onTogglePinyin={() => onTogglePinyin(item.id)}
+              onDelete={() => onDelete(item.id)}
+              onAddToList={onAddToList ? () => onAddToList(item.id) : undefined}
             />
           ))}
         </div>
