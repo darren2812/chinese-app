@@ -61,7 +61,6 @@ function Chat() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const activeAudioRef = useRef<ActiveAudio | null>(null);
-  const activeTextStreamRef = useRef<AbortController | null>(null);
   const audioCacheRef = useRef(new Map<string, Blob>());
   const recordingStoppedAtRef = useRef<number | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
@@ -121,30 +120,6 @@ function Chat() {
     navigate(`/app/chat/${activeConversationId}`, { replace: true });
   }
 
-  async function getResponse(
-    userMessageId: string,
-    conversationId: string,
-  ): Promise<StoredMessage> {
-    const response = await apiFetch("/respond", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message_id: userMessageId,
-        conversation_id: conversationId,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Could not generate response");
-    }
-
-    const data: StoredMessage = await response.json();
-    logTimingCheckpoint("Full message received", data.id);
-    return data;
-  }
-
   type TextStreamEvent =
     | { type: "delta"; text: string }
     | { type: "done"; message: StoredMessage }
@@ -173,7 +148,6 @@ function Chat() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let fullText = "";
 
     try {
       while (true) {
@@ -194,7 +168,7 @@ function Chat() {
           // and then getting rid of the "data: "
           const data = eventBlock
             .split("\n")
-            .filter((line) => line.startsWith("data"))
+            .filter((line) => line.startsWith("data: "))
             .map((line) => line.slice(6))
             .join("\n");
 
@@ -203,7 +177,6 @@ function Chat() {
           const event = JSON.parse(data) as TextStreamEvent;
 
           if (event.type === "delta") {
-            fullText += event.text;
             onDelta(event.text);
           }
 
@@ -212,6 +185,7 @@ function Chat() {
           }
 
           if (event.type === "done") {
+            logTimingCheckpoint("Full message received", event.message.id);
             return event.message;
           }
         }
@@ -326,21 +300,59 @@ function Chat() {
       },
     ]);
 
-    const responsePromise = getResponse(userMessageId, activeConversationId);
-    const processPromise = processSentence(userMessageId);
-
-    const assistantResponse = await responsePromise;
+    const temporaryId = crypto.randomUUID();
 
     setMessages((messages) => [
       ...messages,
-      {
-        id: assistantResponse.id,
-        text: assistantResponse.content,
-        sender: assistantResponse.role,
-      },
+      { id: temporaryId, text: "", sender: "assistant" },
     ]);
 
-    void fetchAndPlayFullMessageAudio(assistantResponse.id).catch(
+    const responsePromise = getStreamedResponse(
+      userMessageId,
+      activeConversationId,
+      (delta) => {
+        setMessages((messages) =>
+          messages.map((message) =>
+            message.id === temporaryId
+              ? { ...message, text: message.text + delta }
+              : message,
+          ),
+        );
+      },
+    );
+
+    const processPromise = processSentence(userMessageId).catch((error) => {
+      console.error("Sentence processing failed:", error);
+      return null;
+    });
+
+    const assistantResponse = await responsePromise.catch((error) => {
+      console.log("Response stream failed: ", error);
+      return null;
+    });
+
+    // if assistant response is null, then don't display the streamed message
+    if (assistantResponse === null) {
+      setMessages((messages) =>
+        messages.filter((message) => message.id !== temporaryId),
+      );
+      return;
+    }
+
+    setMessages((messages) =>
+      messages.map((message) =>
+        message.id === temporaryId
+          ? {
+              ...message,
+              id: assistantResponse.id,
+              text: assistantResponse.content,
+              sender: assistantResponse.role,
+            }
+          : message,
+      ),
+    );
+
+    void streamMessageAudio(assistantResponse.id).catch(
       (error: unknown) => {
         console.error("TTS playback failed:", error);
       },
@@ -350,9 +362,10 @@ function Chat() {
     const processResult = await processPromise;
 
     if (
-      processResult.components.length > 0 ||
-      processResult.corrected_sentence?.trim() ||
-      processResult.grammar_note?.trim()
+      processResult !== null &&
+      (processResult.components.length > 0 ||
+        processResult.corrected_sentence?.trim() ||
+        processResult.grammar_note?.trim())
     ) {
       setMessages((messages) =>
         messages.map((message) =>
@@ -708,7 +721,6 @@ function Chat() {
   }
 
   useEffect(() => discardActiveAudio, []);
-  useEffect(() => () => activeTextStreamRef.current?.abort(), []);
   useEffect(() => {
     if (!conversationId) {
       const resetNewChat = window.setTimeout(() => {
