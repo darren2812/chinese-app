@@ -41,7 +41,9 @@ app.add_middleware(
 )
 
 
-def get_message(message_id: UUID, user_id: str, expected_role: Role | None = None) -> dict:
+def get_message(
+    message_id: UUID, user_id: str, expected_role: Role | None = None
+) -> dict:
     result = (
         supabase.table("messages")
         .select("id, conversation_id, user_id, role, content")
@@ -130,13 +132,17 @@ def generate_message_audio(
     message = get_message(message_id, user_id, Role.ASSISTANT)
 
     def audio_chunks():
-        with client.audio.speech.with_streaming_response.create(
-            model="gpt-4o-mini-tts",
-            voice="marin",
-            input=message["content"],
-            response_format="mp3",
-        ) as tts_response:
-            yield from tts_response.iter_bytes()
+        try: 
+            with client.audio.speech.with_streaming_response.create(
+                model="gpt-4o-mini-tts",
+                voice="marin",
+                input=message["content"],
+                response_format="mp3",
+            ) as tts_response:
+                yield from tts_response.iter_bytes()
+        except Exception:
+            logger.exception("Audio stream failed for message %s", message_id)
+            return
 
     return StreamingResponse(
         audio_chunks(),
@@ -540,6 +546,11 @@ def create_message(request: CreateMessageRequest, claims: dict = Depends(require
         ) from exc
 
 
+def sse_event(data: dict) -> str:
+    payload = json.dumps(data, ensure_ascii=False)
+    return f"data: {payload}\n\n"
+
+
 @app.post("/respond")
 def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
     user_id = claims["sub"]
@@ -574,7 +585,7 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
             *history,
         ]
 
-        response = client.responses.create(
+        stream = client.responses.create(
             model="gpt-4o-mini",
             instructions=(
                 "You are a friendly Mandarin conversation partner. "
@@ -584,43 +595,76 @@ def respond(request: MessageIdRequest, claims: dict = Depends(require_user)):
                 "do not mechanically list or quiz them."
             ),
             input=input_messages,
+            stream=True,
         )
 
-        assistant_text = response.output_text
+        def text_chunks():
+            full_text = ""
 
-        if not assistant_text.strip():
-            raise HTTPException(
-                status_code=502,
-                detail="The model returned an empty response.",
-            )
+            try:
+                for event in stream:
+                    if event.type == "response.output_text.delta":
+                        full_text += event.delta
+                        yield sse_event({"type": "delta", "text": event.delta})
 
-        result = (
-            supabase.table("messages")
-            .insert(
-                {
-                    "conversation_id": message["conversation_id"],
-                    "user_id": user_id,
-                    "role": Role.ASSISTANT.value,
-                    "content": assistant_text,
-                }
-            )
-            .execute()
+                    elif event.type == "error":
+                        logger.error("OpenAI stream error: %s", event.code, event.message)
+                        yield sse_event(
+                            {
+                                "type": "error",
+                                "message": "Could not finish the response.",
+                            }
+                        )
+                        return
+
+                if not full_text.strip():
+                    yield sse_event(
+                        {
+                            "type": "error",
+                            "message": "The assistant returned an empty response.",
+                        }
+                    )
+                    return
+
+                result = (
+                    supabase.table("messages")
+                    .insert(
+                        {
+                            "conversation_id": message["conversation_id"],
+                            "user_id": user_id,
+                            "role": Role.ASSISTANT.value,
+                            "content": full_text,
+                        }
+                    )
+                    .execute()
+                )
+
+                if not isinstance(result.data, list) or not result.data:
+                    raise RuntimeError(
+                        "Assistant message was not returned after insert."
+                    )
+
+                yield sse_event(
+                    {
+                        "type": "done",
+                        "message": result.data[0],
+                    }
+                )
+
+            except Exception:
+                logger.exception("Text stream failed for user %s", user_id)
+                yield sse_event(
+                    {
+                        "type": "error",
+                        "message": "Could not generate a response.",
+                    }
+                )
+
+        return StreamingResponse(
+            text_chunks(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-store"},
         )
-
-        if not isinstance(result.data, list) or not result.data:
-            raise HTTPException(
-                status_code=500,
-                detail="Assistant message was not returned.",
-            )
-
-        assistant_message = result.data[0]
-        if not isinstance(assistant_message, dict):
-            raise HTTPException(
-                status_code=500,
-                detail="Supabase returned an unexpected response format.",
-            )
-
-        return assistant_message
 
     except HTTPException:
         raise
@@ -848,12 +892,13 @@ def delete_learning_item(item_id: UUID, claims: dict = Depends(require_user)):
             detail="Unable to delete the learning item right now.",
         ) from exc
 
+
 @app.patch("/learning-items/{item_id}")
 def update_learning_item_source(item_id: UUID, claims: dict = Depends(require_user)):
-    
+
     user_id = claims["sub"]
-    
-    try: 
+
+    try:
         result = (
             supabase.table("learning-items")
             .update(
@@ -868,10 +913,9 @@ def update_learning_item_source(item_id: UUID, claims: dict = Depends(require_us
         raise
     except Exception as exc:
         raise HTTPException(
-            status_code=502,
-            detail="Could not update vocabulary item right now."
+            status_code=502, detail="Could not update vocabulary item right now."
         )
-        
+
 
 @app.post("/transcribe")
 def transcribe(file: UploadFile = File(...), claims: dict = Depends(require_user)):
