@@ -7,6 +7,8 @@ class MessageIdRequest(BaseModel):
     message_id: UUID
     conversation_id: UUID
 
+class ProcessMessageRequest(BaseModel):
+    message_id: UUID
 
 class ProcessedSentence(BaseModel):
     components: list[BaseComponent]

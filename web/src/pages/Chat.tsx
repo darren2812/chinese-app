@@ -1,4 +1,9 @@
-import { useRef, useState, useEffect } from "react";
+import {
+  useRef,
+  useState,
+  useEffect,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import ChatBubble from "../components/ChatBubble";
 import PracticeSetupModal from "../components/PracticeSetupModal";
 import type { PracticeSetup } from "../components/PracticeSetupModal";
@@ -45,10 +50,19 @@ type CreateMessageInput = {
   content: string;
 };
 
+type ActiveAudio = {
+  audio: HTMLAudioElement;
+  controller?: AbortController;
+  objectUrl: string;
+};
+
 function Chat() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const activeAudioRef = useRef<ActiveAudio | null>(null);
+  const audioCacheRef = useRef(new Map<string, Blob>());
+  const recordingStoppedAtRef = useRef<number | null>(null);
   const [firstChat, setFirstChat] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const { conversationId } = useParams();
@@ -59,6 +73,9 @@ function Chat() {
   const [practiceSetup, setPracticeSetup] = useState<PracticeSetup | null>(
     null,
   );
+  const [streamingAudioMessageIds, setStreamingAudioMessageIds] = useState<
+    Set<string>
+  >(() => new Set());
 
   async function handlePracticeStart(setup: PracticeSetup) {
     const activeConversationId = await createConversation(
@@ -88,6 +105,9 @@ function Chat() {
           sender: assistantMessage.role,
         },
       ]);
+      void streamMessageAudio(assistantMessage.id).catch((error: unknown) => {
+        console.error("TTS stream failed:", error);
+      });
       setFirstChat(false);
     } else {
       setMessages([]);
@@ -100,9 +120,15 @@ function Chat() {
     navigate(`/app/chat/${activeConversationId}`, { replace: true });
   }
 
-  async function getResponse(
+  type TextStreamEvent =
+    | { type: "delta"; text: string }
+    | { type: "done"; message: StoredMessage }
+    | { type: "error"; message: string };
+
+  async function getStreamedResponse(
     userMessageId: string,
     conversationId: string,
+    onDelta: (text: string) => void,
   ): Promise<StoredMessage> {
     const response = await apiFetch("/respond", {
       method: "POST",
@@ -115,12 +141,80 @@ function Chat() {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error("Could not generate response");
+    if (!response.ok || !response.body) {
+      throw new Error("Could not start response stream.");
     }
 
-    const data = await response.json();
-    return data;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let boundaryIndex: number;
+
+        // checks if the double line break still exists
+        while ((boundaryIndex = buffer.indexOf("\n\n")) !== -1) {
+          // takes the line leading to the double line break
+          const eventBlock = buffer.slice(0, boundaryIndex);
+          // deletes the two \n characters
+          buffer = buffer.slice(boundaryIndex + 2);
+          // takes a data json file by filtering events that start with data:
+          // and then getting rid of the "data: "
+          const data = eventBlock
+            .split("\n")
+            .filter((line) => line.startsWith("data: "))
+            .map((line) => line.slice(6))
+            .join("\n");
+
+          if (!data) continue;
+
+          const event = JSON.parse(data) as TextStreamEvent;
+
+          if (event.type === "delta") {
+            onDelta(event.text);
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.message);
+          }
+
+          if (event.type === "done") {
+            logTimingCheckpoint("Full message received", event.message.id);
+            return event.message;
+          }
+        }
+      }
+      throw new Error("Response stream ended before a done event.");
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  function logTimingCheckpoint(
+    checkpoint: string,
+    messageId: string,
+    complete = false,
+  ) {
+    const recordingStoppedAt = recordingStoppedAtRef.current;
+
+    if (recordingStoppedAt === null) return;
+
+    const elapsedMs = performance.now() - recordingStoppedAt;
+    console.log(`[Recording stop → audio] ${checkpoint}`, {
+      messageId,
+      elapsedMs: Number(elapsedMs.toFixed(1)),
+    });
+
+    if (complete) recordingStoppedAtRef.current = null;
+  }
+
+  function logAudioPlaybackStarted(messageId: string) {
+    logTimingCheckpoint("Audio playback started", messageId, true);
   }
 
   async function processSentence(
@@ -206,27 +300,72 @@ function Chat() {
       },
     ]);
 
-    const responsePromise = getResponse(userMessageId, activeConversationId);
-    const processPromise = processSentence(userMessageId);
-
-    const assistantResponse = await responsePromise;
+    const temporaryId = crypto.randomUUID();
 
     setMessages((messages) => [
       ...messages,
-      {
-        id: assistantResponse.id,
-        text: assistantResponse.content,
-        sender: assistantResponse.role,
-      },
+      { id: temporaryId, text: "", sender: "assistant" },
     ]);
+
+    const responsePromise = getStreamedResponse(
+      userMessageId,
+      activeConversationId,
+      (delta) => {
+        setMessages((messages) =>
+          messages.map((message) =>
+            message.id === temporaryId
+              ? { ...message, text: message.text + delta }
+              : message,
+          ),
+        );
+      },
+    );
+
+    const processPromise = processSentence(userMessageId).catch((error) => {
+      console.error("Sentence processing failed:", error);
+      return null;
+    });
+
+    const assistantResponse = await responsePromise.catch((error) => {
+      console.log("Response stream failed: ", error);
+      return null;
+    });
+
+    // if assistant response is null, then don't display the streamed message
+    if (assistantResponse === null) {
+      setMessages((messages) =>
+        messages.filter((message) => message.id !== temporaryId),
+      );
+      return;
+    }
+
+    setMessages((messages) =>
+      messages.map((message) =>
+        message.id === temporaryId
+          ? {
+              ...message,
+              id: assistantResponse.id,
+              text: assistantResponse.content,
+              sender: assistantResponse.role,
+            }
+          : message,
+      ),
+    );
+
+    void streamMessageAudio(assistantResponse.id).catch(
+      (error: unknown) => {
+        console.error("TTS playback failed:", error);
+      },
+    );
 
     // 4. Process was already running in parallel
     const processResult = await processPromise;
 
     if (
-      processResult.components.length > 0 ||
-      processResult.corrected_sentence?.trim() ||
-      processResult.grammar_note?.trim()
+      processResult !== null &&
+      (processResult.components.length > 0 ||
+        processResult.corrected_sentence?.trim() ||
+        processResult.grammar_note?.trim())
     ) {
       setMessages((messages) =>
         messages.map((message) =>
@@ -238,9 +377,13 @@ function Chat() {
     }
   }
 
-  async function handleOnRecordingClick() {
+  async function handleOnRecordingClick(
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
     if (recording) {
       // access the current reference of the media recorder and stop it
+      recordingStoppedAtRef.current = event.timeStamp;
+      console.log("[Recording stop → audio] Recording stopped");
       mediaRecorderRef.current?.stop();
       setRecording(false);
       setFirstChat(false);
@@ -357,6 +500,227 @@ function Chat() {
     return response.json();
   }
 
+  function waitForEvent(target: EventTarget, event: string) {
+    return new Promise<void>((resolve) =>
+      target.addEventListener(event, () => resolve(), { once: true }),
+    );
+  }
+
+  function discardActiveAudio() {
+    const activeAudio = activeAudioRef.current;
+    if (!activeAudio) return;
+
+    activeAudioRef.current = null;
+    activeAudio.controller?.abort();
+    activeAudio.audio.pause();
+    activeAudio.audio.removeAttribute("src");
+    activeAudio.audio.load();
+    URL.revokeObjectURL(activeAudio.objectUrl);
+  }
+
+  async function playMessageAudio(messageId: string) {
+    discardActiveAudio();
+    const blob = audioCacheRef.current.get(messageId);
+
+    if (blob) {
+      const objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
+      const activeAudio = { audio, objectUrl };
+      activeAudioRef.current = activeAudio;
+
+      const releaseAudio = () => {
+        if (activeAudioRef.current === activeAudio) {
+          activeAudioRef.current = null;
+        }
+        URL.revokeObjectURL(objectUrl);
+      };
+
+      audio.onended = releaseAudio;
+      audio.addEventListener(
+        "playing",
+        () => logAudioPlaybackStarted(messageId),
+        { once: true },
+      );
+      audio.onerror = () => {
+        console.error(
+          "Reply audio could not be decoded or played.",
+          audio.error,
+        );
+        releaseAudio();
+      };
+
+      await audio.play();
+    } else {
+      await streamMessageAudio(messageId);
+    }
+  }
+
+  function setAudioStreaming(messageId: string, isStreaming: boolean) {
+    setStreamingAudioMessageIds((ids) => {
+      const nextIds = new Set(ids);
+
+      if (isStreaming) {
+        nextIds.add(messageId);
+      } else {
+        nextIds.delete(messageId);
+      }
+
+      return nextIds;
+    });
+  }
+
+  async function fetchAndPlayFullMessageAudio(messageId: string) {
+    discardActiveAudio();
+    setAudioStreaming(messageId, true);
+
+    const controller = new AbortController();
+
+    try {
+      const response = await apiFetch(`/messages/${messageId}/audio`, {
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not generate speech");
+      }
+
+      // Calling blob() buffers the entire response before any playback begins.
+      const blob = await response.blob();
+      logTimingCheckpoint("Full audio received", messageId);
+      audioCacheRef.current.set(messageId, blob);
+
+      const objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
+      const activeAudio = { audio, controller, objectUrl };
+      activeAudioRef.current = activeAudio;
+
+      const releaseAudio = () => {
+        if (activeAudioRef.current === activeAudio) {
+          activeAudioRef.current = null;
+        }
+        URL.revokeObjectURL(objectUrl);
+      };
+
+      audio.onended = releaseAudio;
+      audio.addEventListener(
+        "playing",
+        () => logAudioPlaybackStarted(messageId),
+        { once: true },
+      );
+      audio.onerror = () => {
+        console.error(
+          "Reply audio could not be decoded or played.",
+          audio.error,
+        );
+        releaseAudio();
+      };
+
+      await audio.play();
+    } finally {
+      setAudioStreaming(messageId, false);
+    }
+  }
+
+  async function streamMessageAudio(messageId: string) {
+    discardActiveAudio();
+    setAudioStreaming(messageId, true);
+
+    const controller = new AbortController();
+    const response = await apiFetch(`/messages/${messageId}/audio`, {
+      signal: controller.signal,
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error("Could not generate speech");
+    }
+
+    const mimeType = "audio/mpeg";
+
+    if (!MediaSource.isTypeSupported(mimeType)) {
+      throw new Error("This browser cannot progressively play MP3 audio");
+    }
+
+    const mediaSource = new MediaSource();
+    const objectUrl = URL.createObjectURL(mediaSource);
+    const audio = new Audio(objectUrl);
+    const activeAudio = { audio, controller, mediaSource, objectUrl };
+    activeAudioRef.current = activeAudio;
+
+    const releaseAudio = () => {
+      if (activeAudioRef.current === activeAudio) {
+        activeAudioRef.current = null;
+      }
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    audio.onended = releaseAudio;
+    audio.addEventListener(
+      "playing",
+      () => logAudioPlaybackStarted(messageId),
+      { once: true },
+    );
+    audio.onerror = () => {
+      console.error("Reply audio could not be decoded or played.", audio.error);
+      releaseAudio();
+    };
+
+    await waitForEvent(mediaSource, "sourceopen");
+
+    const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+    const reader = response.body.getReader();
+    let playbackStarted = false;
+
+    const chunks: ArrayBuffer[] = [];
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        if (controller.signal.aborted) return;
+
+        if (value) {
+          const copy = new Uint8Array(value.byteLength);
+          copy.set(value);
+
+          chunks.push(copy.buffer);
+          sourceBuffer.appendBuffer(value);
+        }
+
+        await waitForEvent(sourceBuffer, "updateend");
+
+        if (!playbackStarted) {
+          playbackStarted = true;
+          void audio.play().catch((error) => {
+            console.log(error);
+          });
+        }
+      }
+
+      if (!controller.signal.aborted && mediaSource.readyState === "open") {
+        mediaSource.endOfStream();
+      }
+
+      audioCacheRef.current.set(
+        messageId,
+        new Blob(chunks, { type: "audio/mpeg" }),
+      );
+    } catch (error) {
+      if (controller.signal.aborted) return;
+
+      if (mediaSource.readyState === "open") {
+        mediaSource.endOfStream("network");
+      }
+      throw error;
+    } finally {
+      reader.releaseLock();
+      setAudioStreaming(messageId, false);
+    }
+
+    return audio;
+  }
+
+  useEffect(() => discardActiveAudio, []);
   useEffect(() => {
     if (!conversationId) {
       const resetNewChat = window.setTimeout(() => {
@@ -414,6 +778,7 @@ function Chat() {
             messages.map((message) => (
               <ChatBubble
                 key={message.id}
+                messageId={message.id}
                 text={message.text}
                 sender={message.sender}
                 correction={message.correction}
@@ -424,6 +789,10 @@ function Chat() {
                 }
                 onAddItem={
                   message.sender === "assistant" ? addAssitantItem : undefined
+                }
+                isAudioStreaming={streamingAudioMessageIds.has(message.id)}
+                onPlayAudio={
+                  message.sender === "assistant" ? playMessageAudio : undefined
                 }
               />
             ))

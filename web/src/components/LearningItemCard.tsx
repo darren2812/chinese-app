@@ -19,6 +19,8 @@ type LearningItemCardProps = {
   startingLanguage: StartingLanguage;
   onFlip: () => void;
   onTogglePinyin: () => void;
+  onDelete: () => void;
+  onAddToList?: () => void; 
 };
 
 export default function LearningItemCard({
@@ -28,6 +30,8 @@ export default function LearningItemCard({
   startingLanguage,
   onFlip,
   onTogglePinyin,
+  onDelete,
+  onAddToList,
 }: LearningItemCardProps) {
   const frontIsMandarin = startingLanguage === "mandarin";
   const activeSide = flipped ? "back" : "front";
@@ -88,6 +92,29 @@ export default function LearningItemCard({
       <div className="vocabulary-card__inner">
         {renderFace("front", frontIsMandarin)}
         {renderFace("back", !frontIsMandarin)}
+      </div>
+
+      <div className="vocabulary-card__actions">
+        {onAddToList && (
+          <button
+            type="button"
+            className="vocabulary-card__action vocabulary-card__action--add"
+            onClick={onAddToList}
+            aria-label="Add to vocabulary list"
+            title="Add to vocabulary list"
+          >
+            +
+          </button>
+        )}
+        <button
+          type="button"
+          className="vocabulary-card__action vocabulary-card__action--delete"
+          onClick={onDelete}
+          aria-label="Delete learning item"
+          title="Delete learning item"
+        >
+          ×
+        </button>
       </div>
     </article>
   );
