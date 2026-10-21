@@ -1,24 +1,84 @@
+/* Design system tokens — "Persimmon Sunset" (柿 · 梅)
+ * Spec: design-system/mandarin-tutor/MASTER.md
+ * Components should only use the semantic tokens (--color-*, --font-*, --radius-*,
+ * --shadow-*, --ease-*, --dur-*). The legacy aliases at the bottom exist so older
+ * pages keep working until they are migrated. */
+
 /* @link https://utopia.fyi/space/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75|0.5|0.25,1.5|2|3|4|6,s-l&g=s,l,xl,12 */
 /* @link https://utopia.fyi/type/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75|0.5|0.25,1.5|2|3|4|6,s-l&g=s,l,xl,12 */
 
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(18, 17, 19, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Palette primitives */
+  --cream-50: #fffaf5;
+  --cream-100: #fff6ee;
+  --cream-200: #fbeee3;
+  --sand-300: #f0dfd2;
+  --sand-400: #e3cbb9;
+  --ink-900: #2b1e1a;
+  --ink-600: #6e5a52;
+  --persimmon-100: #fbe3d6;
+  --persimmon-500: #c2532b;
+  --persimmon-600: #a8441f;
+  --persimmon-700: #8f3818;
+  --plum-100: #efe6f0;
+  --plum-600: #6b4e71;
+  --apricot-200: #ffd58a;
+  --jade-100: #e2efe6;
+  --jade-700: #3d6b52;
+  --rose-100: #fbe4e1;
+  --rose-700: #a8322a;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Surfaces */
+  --color-bg: var(--cream-100);
+  --color-surface: #fff;
+  --color-surface-sunken: var(--cream-200);
+  --color-surface-raised: var(--cream-50);
+  --color-border: var(--sand-300);
+  --color-border-strong: var(--sand-400);
+  --color-overlay: rgb(43 30 26 / 44%);
 
-  /* Type */
+  /* Text */
+  --color-text: var(--ink-900);
+  --color-text-muted: var(--ink-600);
+  --color-text-on-primary: #fff;
+
+  /* Brand */
+  --color-primary: var(--persimmon-500); /* fills: white text 4.6:1 */
+  --color-primary-hover: var(--persimmon-600);
+  --color-primary-pressed: var(--persimmon-700);
+  --color-primary-text: var(--persimmon-600); /* text on cream: 5.6:1 */
+  --color-primary-soft: var(--persimmon-100);
+  --color-secondary: var(--plum-600); /* pinyin, tags */
+  --color-secondary-soft: var(--plum-100);
+  --color-highlight: var(--apricot-200); /* text selection, focus glow */
+
+  /* Feedback */
+  --color-success: var(--jade-700);
+  --color-success-soft: var(--jade-100);
+  --color-danger: var(--rose-700);
+  --color-danger-soft: var(--rose-100);
+
+  --color-focus-ring: var(--persimmon-500);
+
+  /* Typography */
+  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB",
+    system-ui, sans-serif;
+  --font-serif: "Fraunces", "Noto Serif SC", "Songti SC", Georgia, serif;
+  --font-hanzi: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --font-hanzi-display: "Noto Serif SC", "Songti SC", serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-body: 1.55;
+  --leading-hanzi: 1.7; /* CJK needs more air than Latin */
+
+  /* Type scale */
   --step--2: clamp(0.7813rem, 0.7736rem + 0.0341vw, 0.8rem);
   --step--1: clamp(0.9375rem, 0.9119rem + 0.1136vw, 1rem);
   --step-0: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
@@ -51,20 +111,53 @@
 
   /* Custom pairs */
   --space-s-l: clamp(1.125rem, 0.5625rem + 2.5vw, 2.5rem);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+  /* Shape */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+  --radius-pill: 999px;
+
+  /* Elevation — warm-tinted so shadows don't look grey on cream */
+  --shadow-sm: 0 1px 2px rgb(91 52 30 / 6%), 0 1px 1px rgb(91 52 30 / 4%);
+  --shadow-md: 0 6px 16px -4px rgb(91 52 30 / 12%),
+    0 2px 4px rgb(91 52 30 / 5%);
+  --shadow-lg: 0 18px 40px -12px rgb(91 52 30 / 22%),
+    0 4px 10px rgb(91 52 30 / 6%);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* Sizing */
+  --icon-sm: 1rem;
+  --icon-md: 1.25rem;
+  --icon-lg: 1.5rem;
+  --tap-target: 2.75rem;
+  --content-width: 46rem;
+
+  /* Layers */
+  --z-sticky: 10;
+  --z-modal: 100;
+
+  /* Legacy aliases — migrate usages to the semantic tokens above */
+  --text: var(--color-text-muted);
+  --text-h: var(--color-text);
+  --muted-text: var(--color-text-muted);
+  --bg: var(--color-bg);
+  --page-bg: var(--color-bg);
+  --border: var(--color-border);
+  --code-bg: var(--color-surface-sunken);
+  --accent: var(--color-primary);
+  --accent-bg: var(--color-primary-soft);
+  --accent-border: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  --error: var(--color-danger);
+  --shadow: var(--shadow-md);
+  --sans: var(--font-sans);
+  --heading: var(--font-serif);
+  --mono: var(--font-mono);
 }

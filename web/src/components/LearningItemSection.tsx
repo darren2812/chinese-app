@@ -29,7 +29,15 @@ export default function LearningItemSection({
 }: LearningItemSectionProps) {
   return (
     <section className="vocabulary-section">
-      <h2>{title}</h2>
+      <h2 className="vocabulary-section__title">
+        {title}
+        <span className="vocabulary-section__count">
+          {items.length}
+          <span className="visually-hidden">
+            {items.length === 1 ? " item" : " items"}
+          </span>
+        </span>
+      </h2>
 
       {items.length > 0 ? (
         <div className="vocabulary-grid">

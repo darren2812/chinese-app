@@ -1,19 +1,21 @@
 .app-sidebar {
-  display: flex;
-  flex: 0 0 4rem;
-  flex-direction: column;
-  gap: var(--space-s);
-  min-height: 100dvh;
-  padding: var(--space-s) var(--space-2xs);
-  overflow: hidden;
-  background: var(--code-bg);
-  transition: flex-basis 180ms ease;
   position: sticky;
   top: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 4.25rem;
+  flex-direction: column;
+  gap: var(--space-xs);
+  height: 100dvh;
+  padding: var(--space-s) var(--space-2xs);
+  overflow: hidden;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+  transition: flex-basis var(--dur-base) var(--ease-out);
 }
 
 .app-sidebar--open {
-  flex-basis: 15rem;
+  flex-basis: 16rem;
 }
 
 .app-sidebar__toggle,
@@ -21,15 +23,20 @@
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
-  min-height: 2.75rem;
-  padding: 0 var(--space-2xs);
+  min-height: var(--tap-target);
+  padding: 0 0.6rem;
   border: 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-h);
+  color: var(--color-text);
   font: inherit;
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
   text-decoration: none;
   white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
 .app-sidebar__toggle {
@@ -37,58 +44,56 @@
 }
 
 .app-sidebar__toggle:hover,
-.app-sidebar__link:hover,
-.app-sidebar__link--active {
-  background: var(--accent-bg);
+.app-sidebar__link:hover {
+  background: color-mix(in srgb, var(--color-border) 60%, transparent);
 }
 
-.app-sidebar__toggle:focus-visible,
-.app-sidebar__link:focus-visible {
-  outline: 3px solid var(--accent-border);
-  outline-offset: 2px;
+.app-sidebar__link--active,
+.app-sidebar__link--active:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-text);
+}
+
+.app-sidebar__brand {
+  font-family: var(--font-serif);
+  font-size: var(--step-0);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
 }
 
 .app-sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xs);
+  gap: var(--space-3xs);
 }
 
 .app-sidebar__recent {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: var(--space-2xs);
+  gap: 2px;
   min-width: 0;
+  min-height: 0;
+  margin-inline: calc(-1 * var(--space-2xs));
+  padding-inline: var(--space-2xs);
+  overflow-y: auto;
 }
 
 .app-sidebar__section-heading {
-  margin: var(--space-s) var(--space-2xs) 0;
-  color: var(--muted-text);
-  font-size: var(--step--1);
-}
-
-.app-sidebar__icon {
-  flex: 0 0 1.5rem;
-  width: 1.5rem;
-  height: 1.5rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
+  margin: var(--space-xs) 0.6rem var(--space-3xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--step--2);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .app-sidebar__label {
   width: 0;
   overflow: hidden;
   opacity: 0;
-  transition: opacity 100ms ease;
-}
-
-.app-sidebar__conversation-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
 
 .app-sidebar:not(.app-sidebar--open) .app-sidebar__toggle,
@@ -103,6 +108,7 @@
   transition-delay: 80ms;
 }
 
+/* Recent conversations */
 .conversation-item {
   position: relative;
   display: flex;
@@ -111,8 +117,17 @@
 }
 
 .app-sidebar__conversation {
-  min-width: 0;
   flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+/* Make room for the actions so they never sit on top of the title */
+.conversation-item:hover .app-sidebar__conversation,
+.conversation-item:focus-within .app-sidebar__conversation {
+  padding-right: 4.75rem;
 }
 
 .app-sidebar__conversation-title {
@@ -122,10 +137,13 @@
 }
 
 .conversation-item__actions {
+  position: absolute;
+  right: 0.25rem;
   display: flex;
-  gap: 0.25rem;
+  gap: 2px;
   opacity: 0;
   pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
 
 .conversation-item:hover .conversation-item__actions,
@@ -134,8 +152,30 @@
   pointer-events: auto;
 }
 
+.conversation-item__action {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.conversation-item__action--danger:hover:not(:disabled) {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+/* Touch screens have no hover, so keep actions visible */
+@media (hover: none) {
+  .conversation-item__actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .app-sidebar__conversation {
+    padding-right: 4.75rem;
+  }
+}
+
 @media (max-width: 640px) {
   .app-sidebar--open {
-    flex-basis: 12rem;
+    flex-basis: 13.5rem;
   }
 }

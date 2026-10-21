@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import "./LearningItemCard.css";
 
 export type LearningItem = {
@@ -54,25 +55,27 @@ export default function LearningItemCard({
             isMandarin ? "English" : "Mandarin"
           }`}
         >
+          <span className="tag vocabulary-card__type">{item.type}</span>
           <span
             className={
               isMandarin
                 ? "vocabulary-card__hanzi"
                 : "vocabulary-card__english"
             }
+            lang={isMandarin ? "zh-Hans" : undefined}
           >
             {faceText}
           </span>
 
           {isMandarin && pinyinVisible && (
-            <span className="vocabulary-card__pinyin">{item.pinyin}</span>
+            <span className="vocabulary-card__pinyin pinyin">{item.pinyin}</span>
           )}
         </button>
 
         {isMandarin && isActive && (
           <button
             type="button"
-            className="vocabulary-card__pinyin-toggle"
+            className="vocabulary-card__pinyin-toggle btn btn--ghost btn--sm"
             onClick={onTogglePinyin}
             aria-pressed={pinyinVisible}
           >
@@ -98,22 +101,22 @@ export default function LearningItemCard({
         {onAddToList && (
           <button
             type="button"
-            className="vocabulary-card__action vocabulary-card__action--add"
+            className="icon-btn vocabulary-card__action vocabulary-card__action--add"
             onClick={onAddToList}
             aria-label="Add to vocabulary list"
             title="Add to vocabulary list"
           >
-            +
+            <Icon name="plus" size="sm" />
           </button>
         )}
         <button
           type="button"
-          className="vocabulary-card__action vocabulary-card__action--delete"
+          className="icon-btn vocabulary-card__action vocabulary-card__action--delete"
           onClick={onDelete}
           aria-label="Delete learning item"
           title="Delete learning item"
         >
-          ×
+          <Icon name="trash" size="sm" />
         </button>
       </div>
     </article>

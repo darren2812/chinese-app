@@ -7,11 +7,18 @@
   overflow-x: hidden;
   background:
     radial-gradient(
-      circle at 90% 0%,
-      color-mix(in srgb, var(--accent) 8%, transparent),
-      transparent 24rem
+      circle at 95% 0%,
+      color-mix(in srgb, var(--color-highlight) 30%, transparent),
+      transparent 26rem
     ),
-    var(--bg);
+    var(--color-bg);
+}
+
+.learning-items-page__header,
+.learning-items-page__sections,
+.learning-items-page__status {
+  max-width: 72rem;
+  margin-inline: auto;
 }
 
 .learning-items-page__header {
@@ -24,30 +31,39 @@
 }
 
 .learning-items-page__header h1 {
-  margin: var(--space-3xs) 0 0;
-  font-size: var(--step-4);
-  line-height: 1;
+  margin: var(--space-3xs) 0 var(--space-2xs);
 }
 
+.learning-items-page__subtitle {
+  color: var(--color-text-muted);
+}
+
+/* Starting-language switch */
 .language-control {
   display: flex;
   flex-direction: column;
   gap: var(--space-3xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .language-control__label {
-  color: var(--muted-text, var(--text));
+  color: var(--color-text-muted);
   font-size: var(--step--2);
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
 }
 
 .language-switch {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2xs);
-  color: var(--text-h);
+  min-height: var(--tap-target);
+  color: var(--color-text);
   font-size: var(--step--1);
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   cursor: pointer;
 }
 
@@ -66,12 +82,12 @@
   width: 3rem;
   height: 1.65rem;
   padding: 0.18rem;
-  border: 1px solid var(--accent-border);
-  border-radius: 999px;
-  background: var(--code-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease;
+    background-color var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out);
 }
 
 .language-switch__thumb {
@@ -79,24 +95,23 @@
   width: 1.15rem;
   height: 1.15rem;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
-  transition: transform 180ms ease;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--color-border-strong);
+  transition: transform var(--dur-base) var(--ease-out);
 }
 
 .language-switch__input:checked + .language-switch__track {
-  border-color: var(--accent);
-  background: var(--accent-bg);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
 }
 
-.language-switch__input:checked
-  + .language-switch__track
-  .language-switch__thumb {
+.language-switch__input:checked + .language-switch__track .language-switch__thumb {
+  box-shadow: var(--shadow-sm);
   transform: translateX(1.32rem);
 }
 
 .language-switch__input:focus-visible + .language-switch__track {
-  outline: 3px solid var(--accent-border);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 3px;
 }
 
@@ -108,24 +123,17 @@
 
 .learning-items-page__status {
   box-sizing: border-box;
-  width: 100%;
   padding: var(--space-m);
-  border: 1px dashed var(--border);
-  border-radius: 1rem;
-  background: color-mix(in srgb, var(--code-bg) 65%, transparent);
-  color: var(--text);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  text-align: center;
 }
 
 .learning-items-page__status--error {
-  border-color: #dc6b6b;
-  color: #b42318;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .language-switch__track,
-  .language-switch__thumb {
-    transition: none;
-  }
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
 
 @media (max-width: 640px) {
@@ -134,7 +142,7 @@
   }
 
   .learning-items-page__header {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
   }
 }
