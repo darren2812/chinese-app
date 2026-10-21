@@ -764,7 +764,10 @@ function Chat() {
   return (
     <>
       {showPracticeSetup && (
-        <PracticeSetupModal onStart={handlePracticeStart} />
+        <PracticeSetupModal
+          onStart={handlePracticeStart}
+          onClose={() => setShowPracticeSetup(false)}
+        />
       )}
       <main className="chat">
         <section className="chat__messages" aria-live="polite">

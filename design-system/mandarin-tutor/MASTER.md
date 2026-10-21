@@ -10,8 +10,9 @@ The single source of truth for visual design. When building a page, read this fi
 
 ## Direction
 
-**Persimmon Sunset (柿 · 梅).** A warm, unhurried lifestyle app, not a gamified school app. Think of a
-cosy café notebook: cream paper, persimmon accents, plum for pinyin, serif headings.
+**Persimmon Sunset (柿).** A warm, unhurried lifestyle app, not a gamified school app. Think of a
+cosy café notebook: cream paper, persimmon accents, clay-brown pinyin, serif headings.
+The palette stays in one warm family; there are no cool accents (no purple or blue).
 
 Principles:
 
@@ -41,8 +42,8 @@ Components use **only semantic tokens**. Never use raw hex values or `--persimmo
 | `--color-primary-hover` / `-pressed` | `#A8441F` / `#8F3818` | Interaction states |
 | `--color-primary-text` | `#A8441F` | Persimmon **text** on cream/white (5.6:1) |
 | `--color-primary-soft` | `#FBE3D6` | User messages, active nav, selected rows |
-| `--color-secondary` | `#6B4E71` plum | Pinyin, tags (7.1:1 on white) |
-| `--color-secondary-soft` | `#EFE6F0` | Tag background |
+| `--color-secondary` | `#8A5A44` clay | Pinyin, tags (5.8:1 on white, 5.4:1 on cream) |
+| `--color-secondary-soft` | `#F6E6DA` | Tag background (clay text on it: 4.8:1) |
 | `--color-highlight` | `#FFD58A` apricot | `::selection`, "new" highlights |
 | `--color-success` / `-soft` | `#3D6B52` / `#E2EFE6` jade | Saved, correct |
 | `--color-danger` / `-soft` | `#A8322A` / `#FBE4E1` | Errors, delete |
@@ -66,7 +67,7 @@ Use the fluid type scale (`--step--2` … `--step-5`):
 - Chat message: `--step-0`, `--leading-hanzi`.
 - Vocabulary hanzi: `--step-1` serif SC. Hero hanzi: `--step-5`.
 - Body and UI: `--step--1` to `--step-0`. Eyebrow labels: `--step--2`, uppercase, 0.08em tracking.
-- Pinyin always uses the `.pinyin` class (plum, weight 500).
+- Pinyin always uses the `.pinyin` class (clay, weight 500).
 
 ## Shape, elevation, motion
 
@@ -89,7 +90,7 @@ Use the fluid type scale (`--step--2` … `--step-5`):
 | `<Icon name size label?>` | 24-grid line icons, 1.8 stroke. Decorative unless `label` is set. Add new glyphs to `Icon.tsx`; never use emoji as icons. |
 | `.card` | White surface, hairline border, `--radius-lg`, `--shadow-sm`. |
 | `.chip` | White pill for words/values (e.g. practice words). |
-| `.tag` | Plum lowercase label for word type (vocab, grammar…). |
+| `.tag` | Clay lowercase label for word type (vocab, grammar…). |
 | `.eyebrow` | Uppercase section label inside cards and above lists. |
 | `.hanzi`, `.pinyin` | Chinese text helpers. |
 | `.visually-hidden` | Screen-reader-only text. |

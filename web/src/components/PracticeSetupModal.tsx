@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LearningItem } from "./LearningItemCard";
 import { apiFetch } from "../lib/api";
+import Icon from "./Icon";
 import "./PracticeSetupModal.css";
 
 export type PracticeSetup = {
@@ -10,10 +11,12 @@ export type PracticeSetup = {
 
 type PracticeSetupModalProps = {
   onStart: (setup: PracticeSetup) => Promise<void>;
+  onClose: () => void;
 };
 
 export default function PracticeSetupModal({
   onStart,
+  onClose,
 }: PracticeSetupModalProps) {
   const [items, setItems] = useState<LearningItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
@@ -47,6 +50,15 @@ export default function PracticeSetupModal({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !starting) onClose();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, starting]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -92,6 +104,16 @@ export default function PracticeSetupModal({
         aria-labelledby="practice-modal-title"
       >
         <header className="practice-modal__header">
+          <button
+            type="button"
+            className="icon-btn practice-modal__close"
+            onClick={onClose}
+            disabled={starting}
+            aria-label="Close and chat without a practice list"
+            title="Close"
+          >
+            <Icon name="close" />
+          </button>
           <div>
             <h1 id="practice-modal-title">What would you like to practice?</h1>
           </div>

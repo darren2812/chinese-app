@@ -23,6 +23,17 @@
   box-shadow: var(--shadow);
 }
 
+.practice-modal__header {
+  position: relative;
+  padding-right: var(--tap-target);
+}
+
+.practice-modal__close {
+  position: absolute;
+  top: calc(-1 * var(--space-2xs));
+  right: calc(-1 * var(--space-2xs));
+}
+
 .practice-modal__header h1 {
   margin: var(--space-s) 0;
   font-size: var(--step-2);

@@ -1,4 +1,4 @@
-/* Design system tokens — "Persimmon Sunset" (柿 · 梅)
+/* Design system tokens — "Persimmon Sunset" (柿)
  * Spec: design-system/mandarin-tutor/MASTER.md
  * Components should only use the semantic tokens (--color-*, --font-*, --radius-*,
  * --shadow-*, --ease-*, --dur-*). The legacy aliases at the bottom exist so older
@@ -20,8 +20,8 @@
   --persimmon-500: #c2532b;
   --persimmon-600: #a8441f;
   --persimmon-700: #8f3818;
-  --plum-100: #efe6f0;
-  --plum-600: #6b4e71;
+  --clay-100: #f6e6da;
+  --clay-600: #8a5a44;
   --apricot-200: #ffd58a;
   --jade-100: #e2efe6;
   --jade-700: #3d6b52;
@@ -48,8 +48,8 @@
   --color-primary-pressed: var(--persimmon-700);
   --color-primary-text: var(--persimmon-600); /* text on cream: 5.6:1 */
   --color-primary-soft: var(--persimmon-100);
-  --color-secondary: var(--plum-600); /* pinyin, tags */
-  --color-secondary-soft: var(--plum-100);
+  --color-secondary: var(--clay-600); /* pinyin, tags: 5.8:1 on white */
+  --color-secondary-soft: var(--clay-100);
   --color-highlight: var(--apricot-200); /* text selection, focus glow */
 
   /* Feedback */
