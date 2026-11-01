@@ -1,8 +1,9 @@
 .message {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  max-width: 75%;
+  gap: var(--space-3xs);
+  max-width: min(85%, 36rem);
+  animation: message-in var(--dur-slow) var(--ease-out) both;
 }
 
 .message--user {
@@ -15,110 +16,191 @@
   align-items: flex-start;
 }
 
+@media (max-width: 640px) {
+  .message {
+    max-width: 100%;
+  }
+
+  .chat-bubble {
+    max-width: 92%;
+  }
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Bubbles */
 .chat-bubble {
-  padding: 0.7rem 1rem;
-  border-radius: 1rem;
-  line-height: 1.4;
-}
-
-.chat-bubble--user {
-  background: #2563eb;
-  color: white;
-  border-bottom-right-radius: 0.25rem;
-}
-
-.chat-bubble--assistant {
-  background: #e5e7eb;
-  color: #111827;
-  border-bottom-left-radius: 0.25rem;
-}
-
-.correction-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.65rem;
-  border: 1px solid var(--accent-border);
-  border-radius: 999px;
-  background: var(--accent-bg);
-  color: var(--text-h);
-  font: inherit;
-  font-size: var(--step--1);
-  font-weight: 600;
-  line-height: 1.2;
-  cursor: pointer;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    transform 160ms ease;
-}
-
-.correction-toggle::after {
-  content: "⌄";
-  display: inline-block;
-  font-size: 1.1em;
-  line-height: 0.8;
-  transition: transform 160ms ease;
-}
-
-.correction-toggle:hover {
-  background: color-mix(in srgb, var(--accent-bg) 60%, var(--accent));
-  border-color: var(--accent);
-}
-
-.correction-toggle:active {
-  transform: translateY(1px);
-}
-
-.correction-toggle:focus-visible {
-  outline: 3px solid var(--accent-border);
-  outline-offset: 2px;
-}
-
-.correction-toggle[aria-expanded="true"]::after {
-  transform: rotate(180deg);
-}
-
-.correction-card {
   box-sizing: border-box;
-  width: min(100%, 38rem);
-  padding: var(--space-xs);
-  border: 1px solid var(--accent-border);
-  border-radius: 0.75rem;
-  background: var(--code-bg);
-  box-shadow: var(--shadow);
-  color: var(--text);
-  font-size: var(--step--1);
-  line-height: 1.5;
-  text-align: left;
-}
-
-.correction-card p {
-  margin-top: var(--space-3xs);
+  max-width: 100%;
+  padding: 0.8rem 1.1rem;
+  border-radius: var(--radius-lg);
+  font-size: var(--step-0);
   overflow-wrap: anywhere;
 }
 
-.correction-card__heading {
-  margin: 0;
-  font-size: var(--step--1);
+.chat-bubble__text {
+  font-family: var(--font-hanzi);
+  line-height: var(--leading-hanzi);
+  white-space: pre-wrap;
 }
 
-.correction-card__vocabulary {
-  margin: var(--space-3xs) 0 0;
-  padding-left: 1.25rem;
+.chat-bubble--assistant {
+  border: 1px solid var(--color-border);
+  border-bottom-left-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text);
+}
+
+.chat-bubble--assistant .chat-bubble__text {
+  cursor: text;
+}
+
+.chat-bubble--user {
+  border-bottom-right-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+.chat-bubble__actions {
+  display: flex;
+  margin: var(--space-3xs) -0.5rem -0.4rem;
+}
+
+/* Waiting-for-reply indicator */
+.chat-bubble__typing {
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.55rem 0.1rem;
+}
+
+.chat-bubble__typing span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  animation: typing 1.2s var(--ease-in-out) infinite;
+}
+
+.chat-bubble__typing span:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.chat-bubble__typing span:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* "Chinese help" disclosure */
+.correction-toggle {
+  color: var(--color-primary-text);
+}
+
+.correction-toggle__chevron {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.correction-toggle[aria-expanded="true"] .correction-toggle__chevron {
+  transform: rotate(180deg);
+}
+
+.correction-card,
+.lookup-card {
+  width: min(100%, 32rem);
+  font-size: var(--step--1);
+  text-align: left;
+  animation: message-in var(--dur-base) var(--ease-out) both;
 }
 
 .correction-card__section + .correction-card__section {
-  margin-top: var(--space-s);
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--color-border);
 }
 
-.play-audio-btn {
-  min-height: 48px;
-  padding: 0 20px;
-  border: 1px solid var(--accent-border);
-  border-radius: 999px;
-  background: var(--bg);
-  color: var(--text-h);
-  cursor: pointer;
+.correction-card__section .eyebrow {
+  margin-bottom: var(--space-3xs);
 }
 
+.correction-card__sentence {
+  color: var(--color-text);
+  font-size: var(--step-0);
+}
+
+/* Vocabulary rows: shared by correction + lookup cards */
+.vocab-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vocab-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3xs) var(--space-xs);
+}
+
+.vocab-row > :last-child:not(.vocab-row__meta) {
+  margin-left: auto;
+}
+
+.vocab-row__hanzi {
+  flex: none;
+  min-width: 2.5em;
+  font-family: var(--font-hanzi-display);
+  font-size: var(--step-1);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.vocab-row__meta {
+  display: flex;
+  flex: 1 1 8rem;
+  flex-direction: column;
+  min-width: 0;
+  line-height: var(--leading-snug);
+}
+
+.vocab-row__english {
+  color: var(--color-text-muted);
+}
+
+/* Selection lookup */
+.lookup-card .vocab-row + .vocab-row {
+  padding-top: var(--space-2xs);
+  border-top: 1px solid var(--color-border);
+}
+
+.lookup-card__explanation {
+  margin-top: var(--space-xs);
+  color: var(--color-text-muted);
+  line-height: var(--leading-body);
+}
+
+.lookup-card__added:disabled {
+  opacity: 1;
+  color: var(--color-success);
+  cursor: default;
+}

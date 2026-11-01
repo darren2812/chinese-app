@@ -1,6 +1,7 @@
 import { NavLink, useNavigate, useParams } from "react-router";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
+import Icon from "./Icon";
 import "./AppSidebar.css";
 
 type AppSidebarProps = {
@@ -80,14 +81,10 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
         aria-expanded={isOpen}
         aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
       >
-        <svg
-          className="app-sidebar__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-        <span className="app-sidebar__label">Menu</span>
+        <Icon name="menu" size="lg" />
+        <span className="app-sidebar__label app-sidebar__brand">
+          Mandarin Tutor
+        </span>
       </button>
 
       <nav className="app-sidebar__nav" aria-label="Main navigation">
@@ -98,14 +95,7 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
             `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
           }
         >
-          <svg
-            className="app-sidebar__icon"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5c-1.2 0-2.34-.28-3.35-.78L4 20l1.78-4.56A7.47 7.47 0 0 1 5 11.5a7.5 7.5 0 1 1 15 0Z" />
-            <path d="M9 11.5h.01M12.5 11.5h.01M16 11.5h.01" />
-          </svg>
+          <Icon name="chat" size="lg" />
           <span className="app-sidebar__label">New Chat</span>
         </NavLink>
 
@@ -115,13 +105,7 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
             `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
           }
         >
-          <svg
-            className="app-sidebar__icon"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path d="m14 5 5 5M4 20l5.5-1.5L19 9l-5-5-9.5 9.5z" />
-          </svg>
+          <Icon name="cards" size="lg" />
           <span className="app-sidebar__label">Learning Items</span>
         </NavLink>
       </nav>
@@ -148,18 +132,22 @@ export default function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
               <div className="conversation-item__actions">
                 <button
                   type="button"
+                  className="icon-btn conversation-item__action"
                   aria-label={`Rename ${conversation.title ?? "conversation"}`}
+                  title="Rename"
                   onClick={() => void renameConversation(conversation)}
                 >
-                  Rename
+                  <Icon name="pencil" size="sm" />
                 </button>
 
                 <button
                   type="button"
+                  className="icon-btn conversation-item__action conversation-item__action--danger"
                   aria-label={`Delete ${conversation.title ?? "conversation"}`}
+                  title="Delete"
                   onClick={() => void deleteConversation(conversation.id)}
                 >
-                  Delete
+                  <Icon name="trash" size="sm" />
                 </button>
               </div>
             </div>

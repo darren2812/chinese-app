@@ -107,8 +107,12 @@ export default function LearningItems() {
   return (
     <main className="learning-items-page">
       <header className="learning-items-page__header">
-        <div>
-          <h1>Learning Items</h1>
+        <div className="learning-items-page__intro">
+          <p className="eyebrow">Study deck</p>
+          <h1>Learning items</h1>
+          <p className="learning-items-page__subtitle">
+            Tap a card to flip it and test yourself.
+          </p>
         </div>
 
         <div className="language-control">

@@ -5,6 +5,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import ChatBubble from "../components/ChatBubble";
+import Icon from "../components/Icon";
 import PracticeSetupModal from "../components/PracticeSetupModal";
 import type { PracticeSetup } from "../components/PracticeSetupModal";
 import "./Chat.css";
@@ -58,6 +59,7 @@ type ActiveAudio = {
 
 function Chat() {
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const activeAudioRef = useRef<ActiveAudio | null>(null);
@@ -278,6 +280,7 @@ function Chat() {
 
   async function handleRecordedAudio(audioBlob: Blob) {
     const transcription = await sendAudioForTranscription(audioBlob);
+    setTranscribing(false);
 
     let activeConversationId = conversationId;
 
@@ -414,10 +417,13 @@ function Chat() {
 
           stream.getTracks().forEach((track) => track.stop());
 
+          setTranscribing(true);
           try {
             await handleRecordedAudio(audioBlob);
           } catch (error) {
             console.log("Could not transcribe", error);
+          } finally {
+            setTranscribing(false);
           }
         };
 
@@ -758,22 +764,34 @@ function Chat() {
   return (
     <>
       {showPracticeSetup && (
-        <PracticeSetupModal onStart={handlePracticeStart} />
+        <PracticeSetupModal
+          onStart={handlePracticeStart}
+          onClose={() => setShowPracticeSetup(false)}
+        />
       )}
       <main className="chat">
         <section className="chat__messages" aria-live="polite">
           {practiceSetup && practiceSetup.items.length > 0 && (
             <aside className="chat__practice-list" aria-label="Practice words">
-              <span>Practicing</span>
+              <span className="eyebrow">Practicing</span>
               {practiceSetup.items.map((item) => (
-                <span key={item.id} lang="zh-Hans">
+                <span key={item.id} className="chip hanzi" lang="zh-Hans">
                   {item.mandarin}
                 </span>
               ))}
             </aside>
           )}
           {firstChat ? (
-            <p className="chat__empty">Start speaking…</p>
+            <div className="chat__empty">
+              <p className="chat__empty-greeting" lang="zh-Hans">
+                你好
+              </p>
+              <h1 className="chat__empty-title">Let’s chat in Mandarin</h1>
+              <p className="chat__empty-hint">
+                Tap the microphone and say anything. Mix in English when
+                you’re stuck and your tutor will help.
+              </p>
+            </div>
           ) : (
             messages.map((message) => (
               <ChatBubble
@@ -802,11 +820,25 @@ function Chat() {
         <footer className="chat__composer">
           <button
             type="button"
-            className="recording-btn"
+            className={`mic-btn${recording ? " mic-btn--recording" : ""}`}
             onClick={handleOnRecordingClick}
+            disabled={transcribing}
+            aria-pressed={recording}
+            aria-label={recording ? "Stop recording" : "Start recording"}
           >
-            {recording ? "Stop recording" : "Start recording"}
+            <Icon
+              name={transcribing ? "loader" : recording ? "stop" : "mic"}
+              size="lg"
+              className={transcribing ? "icon--spin" : ""}
+            />
           </button>
+          <p className="chat__composer-status" role="status">
+            {transcribing
+              ? "Transcribing…"
+              : recording
+                ? "Listening… tap to send"
+                : "Tap to speak"}
+          </p>
         </footer>
       </main>
     </>

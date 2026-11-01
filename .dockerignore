@@ -1,0 +1,65 @@
+# Local credentials and environment files (including .env.local, .env.production).
+**/.env
+**/.env.*
+**/secrets.dev.yaml
+**/values.dev.yaml
+
+# Version control, editor settings, and local assistant state.
+**/.git
+**/.gitignore
+**/.idea
+**/.vscode
+**/.claude
+**/.codex
+**/.agents
+**/.DS_Store
+**/*.swp
+**/*.swo
+**/*~
+
+# Python environments, bytecode, package output, and tool caches.
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/.uv-cache
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.tox
+**/.nox
+**/.coverage
+**/.coverage.*
+**/htmlcov
+**/*.egg-info
+**/wheels
+
+# JavaScript dependencies, generated bundles, and test output.
+**/node_modules
+**/dist
+**/dist-ssr
+**/build
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+**/playwright-report
+**/test-results
+
+# Logs and temporary files.
+**/*.log
+**/logs
+**/tmp
+**/temp
+
+# Container configuration is not needed inside the application image.
+**/.dockerignore
+**/docker-compose*
+**/compose.y*ml
+**/Dockerfile*
+
+# Backend image: these repository directories are not build inputs.
+/web
+/docs
+/design-system
+/supabase
+README.Docker.md
