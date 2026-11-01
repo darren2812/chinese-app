@@ -702,6 +702,7 @@ def process(request: ProcessMessageRequest, claims: dict = Depends(require_user)
                 6. Identify at most one important grammar issue, only if there is a meaningful issue. Output in English.
                 7. If there is no meaningful grammar issue, return null for the grammar note.
                 8. If no grammar issues in the transcript, return null for the corrected sentence.
+                9. Suggest a corrected sentence if there are grammar issues or English words and copy that into the `corrected_sentence` field.
                 """,
             input=message["content"],
             text_format=ProcessedSentence,
