@@ -2,6 +2,7 @@ import {
   useRef,
   useState,
   useEffect,
+  useCallback,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import ChatBubble from "../components/ChatBubble";
@@ -10,6 +11,7 @@ import PracticeSetupModal from "../components/PracticeSetupModal";
 import type { PracticeSetup } from "../components/PracticeSetupModal";
 import "./Chat.css";
 import { apiFetch } from "../lib/api";
+import { playAudioResponse } from "../lib/messageAudio";
 import { useParams, useNavigate } from "react-router";
 
 export type BaseComponent = {
@@ -55,6 +57,7 @@ type ActiveAudio = {
   audio: HTMLAudioElement;
   controller?: AbortController;
   objectUrl: string;
+  messageId?: string;
 };
 
 function Chat() {
@@ -506,23 +509,25 @@ function Chat() {
     return response.json();
   }
 
-  function waitForEvent(target: EventTarget, event: string) {
-    return new Promise<void>((resolve) =>
-      target.addEventListener(event, () => resolve(), { once: true }),
-    );
-  }
-
-  function discardActiveAudio() {
+  const discardActiveAudio = useCallback(() => {
     const activeAudio = activeAudioRef.current;
     if (!activeAudio) return;
 
     activeAudioRef.current = null;
     activeAudio.controller?.abort();
+    const messageId = activeAudio.messageId;
+    if (messageId) {
+      setStreamingAudioMessageIds((ids) => {
+        const nextIds = new Set(ids);
+        nextIds.delete(messageId);
+        return nextIds;
+      });
+    }
     activeAudio.audio.pause();
     activeAudio.audio.removeAttribute("src");
     activeAudio.audio.load();
     URL.revokeObjectURL(activeAudio.objectUrl);
-  }
+  }, []);
 
   async function playMessageAudio(messageId: string) {
     discardActiveAudio();
@@ -575,158 +580,69 @@ function Chat() {
     });
   }
 
-  async function fetchAndPlayFullMessageAudio(messageId: string) {
-    discardActiveAudio();
-    setAudioStreaming(messageId, true);
-
-    const controller = new AbortController();
-
-    try {
-      const response = await apiFetch(`/messages/${messageId}/audio`, {
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error("Could not generate speech");
-      }
-
-      // Calling blob() buffers the entire response before any playback begins.
-      const blob = await response.blob();
-      logTimingCheckpoint("Full audio received", messageId);
-      audioCacheRef.current.set(messageId, blob);
-
-      const objectUrl = URL.createObjectURL(blob);
-      const audio = new Audio(objectUrl);
-      const activeAudio = { audio, controller, objectUrl };
-      activeAudioRef.current = activeAudio;
-
-      const releaseAudio = () => {
-        if (activeAudioRef.current === activeAudio) {
-          activeAudioRef.current = null;
-        }
-        URL.revokeObjectURL(objectUrl);
-      };
-
-      audio.onended = releaseAudio;
-      audio.addEventListener(
-        "playing",
-        () => logAudioPlaybackStarted(messageId),
-        { once: true },
-      );
-      audio.onerror = () => {
-        console.error(
-          "Reply audio could not be decoded or played.",
-          audio.error,
-        );
-        releaseAudio();
-      };
-
-      await audio.play();
-    } finally {
-      setAudioStreaming(messageId, false);
-    }
-  }
-
   async function streamMessageAudio(messageId: string) {
     discardActiveAudio();
     setAudioStreaming(messageId, true);
 
     const controller = new AbortController();
-    const response = await apiFetch(`/messages/${messageId}/audio`, {
-      signal: controller.signal,
-    });
-
-    if (!response.ok || !response.body) {
-      throw new Error("Could not generate speech");
-    }
-
-    const mimeType = "audio/mpeg";
-
-    if (!MediaSource.isTypeSupported(mimeType)) {
-      throw new Error("This browser cannot progressively play MP3 audio");
-    }
-
-    const mediaSource = new MediaSource();
-    const objectUrl = URL.createObjectURL(mediaSource);
-    const audio = new Audio(objectUrl);
-    const activeAudio = { audio, controller, mediaSource, objectUrl };
+    const audio = new Audio();
+    const activeAudio: ActiveAudio = { audio, controller, objectUrl: "", messageId };
+    // Register before fetching so a newer request or unmount cancels this one.
     activeAudioRef.current = activeAudio;
 
     const releaseAudio = () => {
       if (activeAudioRef.current === activeAudio) {
         activeAudioRef.current = null;
       }
-      URL.revokeObjectURL(objectUrl);
+      URL.revokeObjectURL(activeAudio.objectUrl);
     };
-
     audio.onended = releaseAudio;
     audio.addEventListener(
       "playing",
       () => logAudioPlaybackStarted(messageId),
       { once: true },
     );
-    audio.onerror = () => {
-      console.error("Reply audio could not be decoded or played.", audio.error);
-      releaseAudio();
-    };
-
-    await waitForEvent(mediaSource, "sourceopen");
-
-    const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
-    const reader = response.body.getReader();
-    let playbackStarted = false;
-
-    const chunks: ArrayBuffer[] = [];
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const response = await apiFetch(`/messages/${messageId}/audio`, {
+        signal: controller.signal,
+      });
+      controller.signal.throwIfAborted();
+      if (!response.ok) throw new Error("Could not generate speech");
 
-        if (controller.signal.aborted) return;
-
-        if (value) {
-          const copy = new Uint8Array(value.byteLength);
-          copy.set(value);
-
-          chunks.push(copy.buffer);
-          sourceBuffer.appendBuffer(value);
-        }
-
-        await waitForEvent(sourceBuffer, "updateend");
-
-        if (!playbackStarted) {
-          playbackStarted = true;
-          void audio.play().catch((error) => {
-            console.log(error);
-          });
-        }
-      }
-
-      if (!controller.signal.aborted && mediaSource.readyState === "open") {
-        mediaSource.endOfStream();
-      }
-
-      audioCacheRef.current.set(
-        messageId,
-        new Blob(chunks, { type: "audio/mpeg" }),
+      await playAudioResponse(
+        response,
+        audio,
+        controller.signal,
+        (source) => {
+          controller.signal.throwIfAborted();
+          URL.revokeObjectURL(activeAudio.objectUrl);
+          activeAudio.objectUrl = URL.createObjectURL(source);
+          audio.src = activeAudio.objectUrl;
+          audio.load();
+        },
+        (blob) => {
+          logTimingCheckpoint("Full audio received", messageId);
+          audioCacheRef.current.set(messageId, blob);
+        },
       );
+      audio.onerror = () => {
+        console.error("Reply audio could not be decoded or played.", audio.error);
+        releaseAudio();
+      };
     } catch (error) {
       if (controller.signal.aborted) return;
-
-      if (mediaSource.readyState === "open") {
-        mediaSource.endOfStream("network");
-      }
+      audio.pause();
+      releaseAudio();
       throw error;
     } finally {
-      reader.releaseLock();
-      setAudioStreaming(messageId, false);
+      // discardActiveAudio clears cancelled requests immediately. An old request
+      // must not clear the loading state of a newer request for the same reply.
+      if (!controller.signal.aborted) setAudioStreaming(messageId, false);
     }
-
-    return audio;
   }
 
-  useEffect(() => discardActiveAudio, []);
+  useEffect(() => discardActiveAudio, [discardActiveAudio]);
   useEffect(() => {
     if (!conversationId) {
       const resetNewChat = window.setTimeout(() => {

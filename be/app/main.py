@@ -33,9 +33,18 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
+# Comma-separated list, e.g. "http://localhost:5173,https://myapp.vercel.app"
+raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+
+cors_origins = []
+for origin in raw_origins.split(","):
+    cleaned = origin.strip()
+    if cleaned:
+        cors_origins.append(cleaned)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=cors_origins,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
